@@ -1,0 +1,536 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Her Motorsport — Sim Racing Community</title>
+  <meta name="description" content="Her Motorsport is an inclusive, friendly sim racing community with multiple divisions including our equal-car Spec Racing series, championships, and casual paddock events. All skill levels welcome.">
+  <meta name="theme-color" content="#0f0d13">
+  <meta property="og:title" content="Her Motorsport — Sim Racing Community">
+  <meta property="og:description" content="An inclusive, friendly sim racing community. Fair grids, multiple divisions, good people.">
+  <meta property="og:image" content="assets/img/hm-shield.png">
+  <link rel="icon" href="assets/img/favicon.svg" type="image/svg+xml">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Montserrat:ital,wght@0,600;0,700;1,600;1,700;1,800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="assets/css/style.css">
+</head>
+<body>
+  <a class="skip" href="#main">Skip to content</a>
+
+  <header class="site-header">
+    <div class="wrap">
+      <a class="brand" href="index.html">
+        <img src="assets/img/hm-shield.png" alt="" width="40" height="35">
+        <span>Her Motorsport</span>
+      </a>
+      <button class="nav-toggle" aria-expanded="false" aria-controls="site-nav">Menu</button>
+      <nav class="nav" id="site-nav" aria-label="Main">
+        <ul>
+          <li><a href="#about">About</a></li>
+          <li><a href="#series">Divisions</a></li>
+          <li><a href="#schedule">Schedule</a></li>
+          <li><a href="#roster">Roster</a></li>
+          <li><a href="#members">Portal</a></li>
+          <li><a href="#faq">FAQ</a></li>
+          <li><a href="#conduct">Code of Conduct</a></li>
+          <li><a id="nav-auth-btn" class="nav-auth-btn" href="#members">Driver Sign In</a></li>
+        </ul>
+      </nav>
+    </div>
+  </header>
+
+  <main id="main">
+    <!-- HOME & PADDOCK SPA VIEW -->
+    <div id="view-home" class="spa-view active">
+      <!-- HERO -->
+      <section class="hero" id="home">
+        <div class="wrap">
+          <div class="hero-brand-lockup">
+            <img class="hero-shield-img" src="assets/img/hm-shield.png" alt="Her Motorsport Shield" width="130" height="114">
+            <div class="hero-brand-text">
+              <h1 class="hero-brand-title"><span class="chrome-text">Her Motorsport</span></h1>
+              <span class="hero-brand-badge">
+                <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="12" cy="12" r="10"/><polygon points="10 8 16 12 10 16 10 8"/></svg>
+                Sim Racing Community &amp; Divisions
+              </span>
+            </div>
+          </div>
+
+          <!-- Welcoming Hero Graphic Banner -->
+          <div class="hero-banner-container">
+            <div class="hero-banner-wrapper">
+              <img class="hero-banner-img" src="assets/img/hero-banner.jpg" alt="Welcoming Her Motorsport sim racer at high-tech direct drive racing rig driving on scenic open road" width="1920" height="1080" loading="eager">
+              <div class="hero-banner-overlay" aria-hidden="true"></div>
+              <div class="hero-banner-tag">
+                <span class="live-dot" aria-hidden="true"></span>
+                <span>Paddock Open &bull; All Skill Levels Welcome</span>
+              </div>
+            </div>
+          </div>
+
+          <p class="lede">An inclusive, friendly sim racing community. Multiple racing divisions including our flagship Spec Racing series, clean competition, and a paddock where every driver belongs, whether it's your first race or your five-hundredth.</p>
+          <div class="hero-actions">
+            <a class="btn" href="#members">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg>
+              Get Paddock Pass
+            </a>
+            <a class="btn ghost" href="#series">See Divisions</a>
+          </div>
+          <ul class="hero-tags" aria-label="Highlights">
+            <li>All skill levels</li>
+            <li>Women, trans &amp; non-binary drivers centred</li>
+            <li>Allies welcome</li>
+            <li>Spec &amp; Open Divisions</li>
+          </ul>
+        </div>
+      </section>
+      <div class="checker fade" aria-hidden="true"></div>
+
+      <!-- ABOUT -->
+      <section id="about">
+      <div class="wrap grid grid-2">
+        <div>
+          <span class="eyebrow">Who we are</span>
+          <h2><span class="chrome-text">Racing is better together</span></h2>
+          <p class="lede">Her Motorsport started with a simple idea: sim racing should feel welcoming. We're a community built around women and gender-diverse drivers, open to anyone who shares our values and wants to race hard, race fair, and have a laugh doing it.</p>
+          <ul class="checklist">
+            <li>Multiple racing divisions — including our equal-car Spec Racing division</li>
+            <li>Practice sessions and friendly coaching for newer drivers</li>
+            <li>Active moderation and a clear Code of Conduct</li>
+            <li>Streamed race nights, driver profiles, and supportive community chat</li>
+          </ul>
+        </div>
+        <div class="shield-art">
+          <img src="assets/img/hm-shield.png" alt="Her Motorsport HM shield emblem" width="589" height="516">
+        </div>
+      </div>
+    </section>
+
+    <!-- VALUES -->
+    <section class="alt" id="values">
+      <div class="wrap">
+        <span class="eyebrow">What we stand for</span>
+        <h2>Our paddock values</h2>
+        <div class="grid grid-3" style="margin-top:2rem">
+          <article class="plate">
+            <div class="icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="9" cy="8" r="3.5"/><circle cx="17" cy="9" r="2.5"/><path d="M2.5 20c.8-3.6 3.4-5.5 6.5-5.5s5.7 1.9 6.5 5.5M15 14.6c2.8-.3 5.4 1.3 6.3 4.4"/></svg></div>
+            <h3>Everyone belongs</h3>
+            <p>Every gender, identity, background and skill level. You don't have to prove anything to earn a spot on the grid.</p>
+          </article>
+          <article class="plate">
+            <div class="icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M4 21V4M4 4h13l-2 4 2 4H4"/></svg></div>
+            <h3>Clean racing</h3>
+            <p>Give room, hold your line, own your mistakes. We'd rather finish side by side than win by a punt.</p>
+          </article>
+          <article class="plate">
+            <div class="icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="2.5"/><path d="M12 3v6.5M4.2 16.5l5.6-3.2M19.8 16.5l-5.6-3.2"/></svg></div>
+            <h3>Level grids</h3>
+            <p>Fixed setups in our Spec division mean the fastest driver wins, and the best way to get faster is together.</p>
+          </article>
+          <article class="plate">
+            <div class="icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M3 11a9 9 0 0 1 18 0v5a2 2 0 0 1-2 2h-1v-6h3M3 11v5a2 2 0 0 0 2 2h1v-6H3"/></svg></div>
+            <h3>Learn out loud</h3>
+            <p>Ask the "silly" question. Share replays. Our experienced drivers love helping someone find a tenth.</p>
+          </article>
+          <article class="plate">
+            <div class="icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M12 3 20 6v6c0 4.5-3.4 8-8 9-4.6-1-8-4.5-8-9V6Z"/><path d="m8.5 12 2.5 2.5 4.5-5"/></svg></div>
+            <h3>Safe space</h3>
+            <p>Zero tolerance for harassment, on track or off. Reports are taken seriously and handled privately.</p>
+          </article>
+          <article class="plate">
+            <div class="icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M12 20s-7-4.3-7-10a4 4 0 0 1 7-2.6A4 4 0 0 1 19 10c0 5.7-7 10-7 10Z"/></svg></div>
+            <h3>Have fun</h3>
+            <p>It's a hobby. Celebrate the midfield battles, the comeback drives and the first clean lap.</p>
+          </article>
+        </div>
+      </div>
+    </section>
+
+    <!-- SERIES / DIVISIONS -->
+    <section id="series">
+      <div class="wrap">
+        <span class="eyebrow">Racing Divisions</span>
+        <h2><span class="chrome-text">Divisions &amp; Series</span></h2>
+        <p class="lede">From our signature equal-car Spec Racing division to rookie development and endurance teams. Pick what fits your pace, or try them all.</p>
+        <div class="grid grid-3" style="margin-top:2rem">
+          <article class="plate series-card">
+            <img class="track" src="assets/img/circuit-a.svg" alt="" width="400" height="260">
+            <h3>Rookie Cup</h3>
+            <p>A gentle on-ramp for new and returning drivers. Short races, assists allowed, mentors on hand.</p>
+            <div class="meta"><span class="pill purple">Beginner friendly</span><span class="pill"><span class="tbd">Car TBD</span></span></div>
+          </article>
+          <article class="plate series-card">
+            <img class="track" src="assets/img/circuit-b.svg" alt="" width="400" height="260">
+            <h3>Spec Racing Division</h3>
+            <p>Our flagship equal-car division. Fixed setups where pure driving skill and racecraft decide the winner.</p>
+            <div class="meta"><span class="pill purple">Spec Division</span><span class="pill"><span class="tbd">Equal Cars</span></span></div>
+          </article>
+          <article class="plate series-card">
+            <img class="track" src="assets/img/circuit-c.svg" alt="" width="400" height="260">
+            <h3>Endurance &amp; Open</h3>
+            <p>Team endurance events, multiclass battles, and special event weekends. Share a car and swap stints.</p>
+            <div class="meta"><span class="pill purple">Team event</span><span class="pill"><span class="tbd">Dates TBD</span></span></div>
+          </article>
+        </div>
+      </div>
+    </section>
+
+    <!-- SCHEDULE -->
+    <section class="alt" id="schedule">
+      <div class="wrap">
+        <span class="eyebrow">Race calendar</span>
+        <h2>Upcoming races</h2>
+        <div class="table-scroll">
+          <table class="schedule">
+            <thead>
+              <tr><th scope="col">Date</th><th scope="col">Series</th><th scope="col">Track</th><th scope="col">Start</th></tr>
+            </thead>
+            <tbody>
+              <tr><td><span class="tbd">TBD</span></td><td>Rookie Cup — Round 1</td><td><span class="tbd">TBD</span></td><td><span class="tbd">TBD</span></td></tr>
+              <tr><td><span class="tbd">TBD</span></td><td>Spec Racing Division — Round 1</td><td><span class="tbd">TBD</span></td><td><span class="tbd">TBD</span></td></tr>
+              <tr><td><span class="tbd">TBD</span></td><td>Rookie Cup — Round 2</td><td><span class="tbd">TBD</span></td><td><span class="tbd">TBD</span></td></tr>
+            </tbody>
+          </table>
+        </div>
+        <p class="note">Full calendar and sign-ups are posted in our community server.</p>
+      </div>
+    </section>
+
+    <!-- MEMBERSHIP & DRIVER PORTAL -->
+    <section class="portal-section" id="members">
+      <div class="wrap">
+        <div class="serverless-badge">
+          <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
+          Serverless Paddock Network &amp; Discord Auth
+        </div>
+        <span class="eyebrow">Driver Membership</span>
+        <h2><span class="chrome-text">Get Your Paddock Pass</span></h2>
+        <p class="lede">Join Her Motorsport as an official driver. Reserve your car number, connect your Discord, and get ready for live telemetry and series registration.</p>
+
+        <div class="portal-grid">
+          <!-- Left: Auth Forms & Dashboard -->
+          <div class="plate portal-panel" id="membership-portal">
+            
+            <!-- When logged out: Registration & Login forms -->
+            <div id="portal-forms-view">
+              <div class="portal-tabs" role="tablist">
+                <button type="button" class="tab-btn active" id="tab-btn-signup" role="tab" aria-selected="true">Register Pass</button>
+                <button type="button" class="tab-btn" id="tab-btn-login" role="tab" aria-selected="false">Driver Sign In</button>
+              </div>
+
+              <!-- Instant Discord OAuth -->
+              <button type="button" class="btn-discord-login" id="btn-discord-login">
+                <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M20.317 4.37a19.791 19.791 0 0 0-4.885-1.515.074.074 0 0 0-.079.037c-.21.375-.444.864-.608 1.25a18.27 18.27 0 0 0-5.487 0 12.64 12.64 0 0 0-.617-1.25.077.077 0 0 0-.079-.037A19.736 19.736 0 0 0 3.677 4.37a.07.07 0 0 0-.032.027C.533 9.046-.32 13.58.099 18.057a.082.082 0 0 0 .031.057 19.9 19.9 0 0 0 5.993 3.03.078.078 0 0 0 .084-.028c.462-.63.874-1.295 1.226-1.994.021-.041.001-.09-.041-.106a13.107 13.107 0 0 1-1.872-.892.077.077 0 0 1-.008-.128 10.2 10.2 0 0 0 .372-.292.074.074 0 0 1 .077-.01c3.929 1.793 8.18 1.793 12.061 0a.074.074 0 0 1 .078.01c.12.098.246.198.373.292a.077.077 0 0 1-.006.127 12.299 12.299 0 0 1-1.873.894.077.077 0 0 0-.041.107c.36.698.772 1.362 1.225 1.993a.076.076 0 0 0 .084.028 19.839 19.839 0 0 0 6.002-3.03.077.077 0 0 0 .032-.054c.5-5.177-.838-9.674-3.549-13.66a.061.061 0 0 0-.031-.028zM8.02 15.33c-1.183 0-2.157-1.085-2.157-2.419 0-1.333.956-2.419 2.157-2.419 1.21 0 2.176 1.096 2.157 2.42 0 1.333-.956 2.418-2.157 2.418zm7.975 0c-1.183 0-2.157-1.085-2.157-2.419 0-1.333.955-2.419 2.157-2.419 1.21 0 2.176 1.096 2.157 2.42 0 1.333-.946 2.418-2.157 2.418z"/></svg>
+                Fast-Connect with Discord
+              </button>
+
+              <div class="oauth-divider"><span>or with email</span></div>
+              <div class="form-success" id="signup-success"></div>
+
+              <!-- Sign Up Form -->
+              <form class="portal-form" id="form-signup" onsubmit="return false;">
+                <div class="form-row">
+                  <div class="form-group">
+                    <label for="signup-alias">Driver Name / Alias *</label>
+                    <input type="text" id="signup-alias" name="alias" placeholder="e.g. Maya Ross" required>
+                  </div>
+                  <div class="form-group">
+                    <label for="signup-pronouns">Pronouns</label>
+                    <input type="text" id="signup-pronouns" name="pronouns" placeholder="e.g. she/her, they/them">
+                  </div>
+                </div>
+
+                <div class="form-row">
+                  <div class="form-group">
+                    <label for="signup-email">Email Address *</label>
+                    <input type="email" id="signup-email" name="email" placeholder="driver@email.com" required>
+                  </div>
+                  <div class="form-group">
+                    <label for="signup-password">Password *</label>
+                    <input type="password" id="signup-password" name="password" placeholder="••••••••" required minlength="4">
+                  </div>
+                </div>
+
+                <div class="form-row">
+                  <div class="form-group">
+                    <label for="signup-number">Preferred Car # (0-999)</label>
+                    <input type="text" id="signup-number" name="car_number" placeholder="42" maxlength="3">
+                  </div>
+                  <div class="form-group">
+                    <label for="signup-sim">Primary Sim Platform</label>
+                    <select id="signup-sim" name="sim">
+                      <option value="iRacing">iRacing</option>
+                      <option value="Assetto Corsa">Assetto Corsa</option>
+                      <option value="ACC">Assetto Corsa Competizione</option>
+                      <option value="Le Mans Ultimate">Le Mans Ultimate</option>
+                      <option value="Other">Other Sim</option>
+                    </select>
+                  </div>
+                </div>
+
+                <div class="form-row">
+                  <div class="form-group">
+                    <label for="signup-division">Primary Division</label>
+                    <select id="signup-division" name="division">
+                      <option value="Spec Racing">Spec Racing Division</option>
+                      <option value="Rookie Cup">Rookie Cup</option>
+                      <option value="Endurance">Endurance &amp; Team</option>
+                      <option value="Open Paddock">Casual Paddock Nights</option>
+                    </select>
+                  </div>
+                  <div class="form-group">
+                    <label for="signup-discord">Discord Username (Optional)</label>
+                    <input type="text" id="signup-discord" name="discord" placeholder="DriverName#0000">
+                  </div>
+                </div>
+
+                <div class="form-row">
+                  <div class="form-group">
+                    <label for="signup-twitch">Twitch Username (Optional)</label>
+                    <input type="text" id="signup-twitch" name="twitch" placeholder="YourChannel">
+                  </div>
+                  <div class="form-group">
+                    <label for="signup-telemetry">Telemetry ID (Optional)</label>
+                    <input type="text" id="signup-telemetry" name="telemetry_id" placeholder="Optional for live telemetry linking">
+                  </div>
+                </div>
+
+                <p class="form-error" id="signup-error"></p>
+                <button type="submit" id="btn-submit-signup" class="btn">Register Paddock Pass</button>
+              </form>
+
+              <!-- Sign In Form (Hidden by default) -->
+              <form class="portal-form" id="form-login" style="display: none;" onsubmit="return false;">
+                <div class="form-group">
+                  <label for="login-email">Email Address</label>
+                  <input type="email" id="login-email" name="email" placeholder="driver@email.com" required>
+                </div>
+                <div class="form-group">
+                  <label for="login-password">Password</label>
+                  <input type="password" id="login-password" name="password" placeholder="••••••••" required>
+                </div>
+                <p class="form-error" id="login-error"></p>
+                <button type="submit" id="btn-submit-login" class="btn">Log In to Paddock</button>
+              </form>
+            </div>
+
+            <!-- When logged in: Dashboard view -->
+            <div id="portal-dashboard-view" style="display: none;">
+              <div class="dashboard-panel">
+                <div class="dash-welcome">
+                  <span class="eyebrow">Paddock Member</span>
+                  <h3>Welcome, <span id="dash-driver-name" class="chrome-text">Driver</span>!</h3>
+                  <p class="lede" style="font-size: 1rem;">Your membership is active and your pass is verified.</p>
+                </div>
+
+                <div class="dash-stats-grid">
+                  <div class="dash-stat-box">
+                    <span class="dash-stat-label">Car Number</span>
+                    <span class="dash-stat-value" id="dash-car-number">#00</span>
+                  </div>
+                  <div class="dash-stat-box">
+                    <span class="dash-stat-label">Division</span>
+                    <span class="dash-stat-value" id="dash-division" style="font-size: 0.95rem;">Spec Racing</span>
+                  </div>
+                  <div class="dash-stat-box">
+                    <span class="dash-stat-label">Platform</span>
+                    <span class="dash-stat-value" id="dash-sim">iRacing</span>
+                  </div>
+                  <div class="dash-stat-box">
+                    <span class="dash-stat-label">Discord</span>
+                    <span class="dash-stat-value" id="dash-discord" style="font-size: 0.88rem;">Linked</span>
+                  </div>
+                  <div class="dash-stat-box">
+                    <span class="dash-stat-label">Twitch</span>
+                    <span class="dash-stat-value" id="dash-twitch" style="font-size: 0.88rem;">None</span>
+                  </div>
+                </div>
+
+                <div class="plate" style="padding: 1rem 1.2rem; background: var(--plate-2);">
+                  <span class="dash-stat-label">Telemetry Receiver Status</span>
+                  <p style="margin: .3rem 0 0; font-size: .88rem; color: var(--ok);">
+                    ● Ready for Live Timing updates (<span id="dash-telemetry">Synced</span>)
+                  </p>
+                </div>
+
+                <div class="dash-actions">
+                  <a class="btn" href="#schedule">View Race Schedule</a>
+                  <button type="button" class="btn ghost" id="btn-logout">Sign Out</button>
+                </div>
+              </div>
+            </div>
+
+          </div>
+
+          <!-- Right: Live Interactive Paddock Pass Card -->
+          <div class="pass-wrapper">
+            <span class="eyebrow">Virtual License</span>
+            <div class="paddock-pass-card" id="paddock-pass-card">
+              <!-- Rendered dynamically by members.js -->
+            </div>
+            <p class="note" style="text-align: center; margin-top: .75rem;">
+              Updates live as you type. Zero server hosting cost.
+            </p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- MEMBER ROSTER -->
+    <section class="alt" id="roster">
+      <div class="wrap">
+        <span class="eyebrow">Community</span>
+        <h2><span class="chrome-text">Driver Roster</span></h2>
+        <p class="lede">Meet the drivers on the grid.</p>
+        <div class="table-scroll">
+          <table class="schedule roster-table">
+            <thead>
+              <tr><th scope="col">Driver</th><th scope="col">Pronouns</th><th scope="col">Primary Sim</th><th scope="col">Twitch</th></tr>
+            </thead>
+            <tbody id="roster-tbody">
+              <!-- Dynamically populated -->
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <!-- JOIN -->
+    <section class="join" id="join">
+      <div class="wrap">
+        <span class="eyebrow">Get on the grid</span>
+        <h2><span class="chrome-text">Join Her Motorsport</span></h2>
+        <p class="lede">No license grade required. No pressure. Just bring a wheel (or a controller!) and a good attitude.</p>
+        <ol class="steps">
+          <li class="plate"><h3>Hop in the chat</h3><p>Join our community server, say hi and grab your roles.</p></li>
+          <li class="plate"><h3>Read the rules</h3><p>Skim the <a href="conduct.html">Code of Conduct</a>. It's short, we promise.</p></li>
+          <li class="plate"><h3>Come to practice</h3><p>Turn some laps with us before your first race. No stopwatch judgement.</p></li>
+          <li class="plate"><h3>Race!</h3><p>Sign up for a round and enjoy the battle, wherever you finish.</p></li>
+        </ol>
+        <div class="hero-actions">
+          <!-- TODO: replace # with real community invite link -->
+          <a class="btn" href="#">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M21 12a8 8 0 0 1-11.6 7.1L4 20l1-4.6A8 8 0 1 1 21 12Z"/></svg>
+            Join our Discord <span class="tbd">link TBD</span>
+          </a>
+        </div>
+      </div>
+    </section>
+
+    <!-- FAQ -->
+    <section id="faq">
+      <div class="wrap">
+        <span class="eyebrow">Questions</span>
+        <h2>FAQ</h2>
+        <div class="faq">
+          <details>
+            <summary>Who can join?</summary>
+            <p>Her Motorsport centres women, trans and non-binary drivers, and welcomes allies who share our values. If you'll treat people with respect, there's a seat for you.</p>
+          </details>
+          <details>
+            <summary>I'm brand new to sim racing. Is that okay?</summary>
+            <p>Absolutely. The Rookie Cup exists for exactly that, and our practice nights are low-key. Plenty of members ran their first ever online race with us.</p>
+          </details>
+          <details>
+            <summary>What sim and hardware do I need?</summary>
+            <p><span class="tbd">Platform details TBD.</span> Any wheel works, and a controller is fine for getting started.</p>
+          </details>
+          <details>
+            <summary>What does "spec racing" mean?</summary>
+            <p>Everyone in our Spec Racing division drives the same car with the same fixed setup. It keeps grids close and puts the focus on driving skill and racecraft. We also host other open and endurance events.</p>
+          </details>
+          <details>
+            <summary>How do I report a problem?</summary>
+            <p>Message any moderator privately. Every report is reviewed, and you'll never be penalised for raising a concern in good faith. Read our <a href="#conduct">Code of Conduct</a>.</p>
+          </details>
+        </div>
+      </div>
+    </section>
+  </div> <!-- /#view-home -->
+
+  <!-- CODE OF CONDUCT SPA VIEW -->
+  <div id="view-conduct" class="spa-view">
+    <div class="hero page-head">
+      <div class="wrap">
+        <span class="eyebrow">Paddock rules</span>
+        <h1><span class="chrome-text">Code of Conduct</span></h1>
+        <p class="lede">Short version: be kind, race clean, and look out for each other. The paddock is for everyone.</p>
+      </div>
+    </div>
+    <div class="checker fade" aria-hidden="true"></div>
+
+    <section>
+      <div class="wrap prose">
+        <h2>Who this applies to</h2>
+        <p>Every member, guest, streamer and moderator, everywhere Her Motorsport gathers: on track, in voice and text chat, on stream, and in DMs with people you met here.</p>
+
+        <h2>Respect everyone</h2>
+        <ul>
+          <li><strong>Use people's names and pronouns.</strong> If you get it wrong, correct yourself and move on.</li>
+          <li><strong>No harassment or discrimination</strong> based on gender, gender identity, sexuality, race, ethnicity, religion, disability, age, body or experience level.</li>
+          <li><strong>No unwanted attention.</strong> This is a racing community, not a dating app.</li>
+          <li><strong>Keep it welcoming for newcomers.</strong> Gatekeeping, mocking slow laps or hardware, and "well actually" lectures aren't our style.</li>
+        </ul>
+
+        <h2>Race clean</h2>
+        <ul>
+          <li>Leave a car's width. Don't divebomb, brake-check or weave to block.</li>
+          <li>If you cause contact, give the place back when it's safe.</li>
+          <li>Rejoin the track safely after an off, and check your mirrors.</li>
+          <li>Keep post-race discussions about incidents calm. Use the incident report process instead of arguing in chat.</li>
+        </ul>
+
+        <h2>Reporting</h2>
+        <p>If something makes you uncomfortable, message any moderator privately. Reports are confidential and handled promptly. You will never be penalised for a good-faith report.</p>
+
+        <h2>Consequences</h2>
+        <p>Depending on severity, moderators may give a warning, a race penalty, a temporary suspension or a permanent removal. Serious harassment can lead to an immediate ban.</p>
+
+        <p class="note"><span class="tbd">Community Draft</span> Review and steward guidelines maintained by the Her Motorsport team.</p>
+
+        <div style="margin-top: 2.5rem; display: flex; gap: 1rem; flex-wrap: wrap;">
+          <a href="#about" class="btn ghost">← Back to Paddock</a>
+          <a href="#members" class="btn">Get Paddock Pass</a>
+        </div>
+      </div>
+    </section>
+  </div> <!-- /#view-conduct -->
+  </main>
+
+  <div class="checker" aria-hidden="true"></div>
+  <footer class="site-footer">
+    <div class="wrap">
+      <div>
+        <div class="footer-brand-lockup">
+          <span class="footer-brand-title">Her Motorsport</span>
+        </div>
+        <p>Inclusive, friendly sim racing community.</p>
+      </div>
+      <div>
+        <h4>Explore</h4>
+        <ul>
+          <li><a href="#about">About</a></li>
+          <li><a href="#series">Divisions</a></li>
+          <li><a href="#schedule">Schedule</a></li>
+          <li><a href="#members">Members</a></li>
+          <li><a href="#conduct">Code of Conduct</a></li>
+        </ul>
+      </div>
+      <div>
+        <h4>Community</h4>
+        <ul>
+          <li><a href="#">Discord <span class="tbd">TBD</span></a></li>
+          <li><a href="#">Twitch <span class="tbd">TBD</span></a></li>
+          <li><a href="#">YouTube <span class="tbd">TBD</span></a></li>
+        </ul>
+      </div>
+      <p class="legal">&copy; <span id="year">2026</span> Her Motorsport. All rights reserved.</p>
+    </div>
+  </footer>
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="assets/js/members.js"></script>
+  <script src="assets/js/main.js"></script>
+</body>
+</html>
