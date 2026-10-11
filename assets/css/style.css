@@ -583,7 +583,7 @@ section { padding: clamp(3.5rem, 8vw, 6rem) 0; }
   color: var(--chrome);
   padding: .75rem .9rem;
   font-family: var(--font-body);
-  font-size: .95rem;
+  font-size: 1rem;
   outline: none;
   transition: border-color .15s, box-shadow .15s;
 }
@@ -980,5 +980,8 @@ section { padding: clamp(3.5rem, 8vw, 6rem) 0; }
   .btn {
     padding: .8rem 1.2rem;
     font-size: .88rem;
+  }
+  .plate {
+    padding: 1.25rem 1rem 1.4rem;
   }
 }
