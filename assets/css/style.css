@@ -592,6 +592,36 @@ section { padding: clamp(3.5rem, 8vw, 6rem) 0; }
   border-color: var(--purple-hi);
   box-shadow: 0 0 0 3px rgba(180, 140, 240, .2);
 }
+
+.password-wrap {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+.password-wrap input {
+  width: 100%;
+  padding-right: 2.5rem; /* Make room for the eyeball */
+}
+.btn-reveal {
+  position: absolute;
+  right: 0.5rem;
+  background: transparent;
+  border: none;
+  color: var(--chrome-dim);
+  cursor: pointer;
+  padding: 0.25rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.btn-reveal:hover {
+  color: var(--chrome);
+}
+.btn-reveal svg {
+  width: 20px;
+  height: 20px;
+}
+
 .form-error {
   color: #ff6b6b;
   font-size: .85rem;
