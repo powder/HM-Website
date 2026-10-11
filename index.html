@@ -414,11 +414,121 @@
                   </p>
                 </div>
 
-                <div class="dash-actions">
-                  <a class="btn" href="#schedule">View Race Schedule</a>
-                  <button type="button" class="btn ghost" id="btn-logout">Sign Out</button>
+                <div class="dash-actions" style="margin-top: 1.5rem; display: flex; flex-wrap: wrap; gap: 0.75rem;">
+                  <button type="button" class="btn" id="btn-edit-profile">Edit Profile</button>
+                  <button type="button" class="btn ghost" id="btn-account-settings">Account Settings</button>
+                  <button type="button" class="btn ghost" id="btn-logout" style="border-color: #ff6b6b; color: #ff6b6b;">Sign Out</button>
                 </div>
               </div>
+            </div>
+
+            <!-- Edit Profile View -->
+            <div id="portal-profile-view" style="display: none;">
+              <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem;">
+                <h3 style="margin: 0; color: #fff;">Edit Profile</h3>
+                <button type="button" class="btn ghost btn-back-dashboard" style="padding: 0.4rem 0.8rem; font-size: 0.8rem;">Back</button>
+              </div>
+              <form class="portal-form" id="form-edit-profile" onsubmit="return false;">
+                <div class="form-row">
+                  <div class="form-group">
+                    <label for="edit-alias">Driver Name / Alias *</label>
+                    <input type="text" id="edit-alias" name="alias" required>
+                  </div>
+                  <div class="form-group">
+                    <label for="edit-pronouns">Pronouns</label>
+                    <input type="text" id="edit-pronouns" name="pronouns">
+                  </div>
+                </div>
+                <div class="form-row">
+                  <div class="form-group">
+                    <label for="edit-number">Preferred Car # (0-999)</label>
+                    <input type="text" inputmode="numeric" pattern="[0-9]*" id="edit-number" name="car_number" maxlength="3">
+                  </div>
+                  <div class="form-group">
+                    <label for="edit-sim">Primary Sim Platform</label>
+                    <select id="edit-sim" name="sim">
+                      <option value="iRacing">iRacing</option>
+                      <option value="Assetto Corsa">Assetto Corsa</option>
+                      <option value="ACC">Assetto Corsa Competizione</option>
+                      <option value="Le Mans Ultimate">Le Mans Ultimate</option>
+                      <option value="Other">Other Sim</option>
+                    </select>
+                  </div>
+                </div>
+                <div class="form-row">
+                  <div class="form-group">
+                    <label for="edit-division">Primary Division</label>
+                    <select id="edit-division" name="division">
+                      <option value="Spec Racing">Spec Racing Division</option>
+                      <option value="Rookie Cup">Rookie Cup</option>
+                      <option value="Endurance">Endurance &amp; Team</option>
+                      <option value="Open Paddock">Casual Paddock Nights</option>
+                    </select>
+                  </div>
+                  <div class="form-group">
+                    <label for="edit-discord">Discord Username</label>
+                    <input type="text" id="edit-discord" name="discord">
+                  </div>
+                </div>
+                <div class="form-row">
+                  <div class="form-group">
+                    <label for="edit-twitch">Twitch Username</label>
+                    <input type="text" id="edit-twitch" name="twitch">
+                  </div>
+                  <div class="form-group">
+                    <label for="edit-telemetry">Telemetry ID</label>
+                    <input type="text" id="edit-telemetry" name="telemetry_id">
+                  </div>
+                </div>
+                <p class="form-error" id="edit-profile-error"></p>
+                <p class="form-success" id="edit-profile-success" style="display:none;"></p>
+                <button type="submit" id="btn-submit-profile" class="btn">Save Profile</button>
+              </form>
+            </div>
+
+            <!-- Account Settings View -->
+            <div id="portal-account-view" style="display: none;">
+              <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem;">
+                <h3 style="margin: 0; color: #fff;">Account Settings</h3>
+                <button type="button" class="btn ghost btn-back-dashboard" style="padding: 0.4rem 0.8rem; font-size: 0.8rem;">Back</button>
+              </div>
+              <form class="portal-form" id="form-edit-account" onsubmit="return false;">
+                <div class="form-group">
+                  <label for="edit-email">New Email Address</label>
+                  <input type="email" id="edit-email" name="email" placeholder="Leave blank to keep current">
+                </div>
+                <div class="form-group">
+                  <label for="edit-account-password">Current Password (Required for email change)</label>
+                  <div class="password-wrap">
+                    <input type="password" id="edit-account-password" name="current_password" placeholder="••••••••">
+                    <button type="button" class="btn-reveal" aria-label="Show password" tabindex="-1">
+                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle></svg>
+                    </button>
+                  </div>
+                </div>
+                <hr style="border: 0; border-top: 1px solid var(--line); margin: 1rem 0;">
+                <div class="form-group">
+                  <label for="edit-new-password">New Password</label>
+                  <div class="password-wrap">
+                    <input type="password" id="edit-new-password" name="new_password" placeholder="Leave blank to keep current">
+                    <button type="button" class="btn-reveal" aria-label="Show password" tabindex="-1">
+                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle></svg>
+                    </button>
+                  </div>
+                </div>
+                <div class="form-group">
+                  <label for="edit-confirm-password">Confirm New Password</label>
+                  <div class="password-wrap">
+                    <input type="password" id="edit-confirm-password" name="confirm_password" placeholder="••••••••">
+                    <button type="button" class="btn-reveal" aria-label="Show password" tabindex="-1">
+                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle></svg>
+                    </button>
+                  </div>
+                </div>
+                <p class="form-error" id="edit-account-error"></p>
+                <p class="form-success" id="edit-account-success" style="display:none;"></p>
+                <button type="submit" id="btn-submit-account" class="btn">Update Account</button>
+              </form>
             </div>
 
           </div>

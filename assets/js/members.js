@@ -263,6 +263,66 @@ window.HER_CONFIG = window.HER_CONFIG || {
     }
   }
 
+  async function updateProfile(data) {
+    if (!currentDriver) throw new Error("Not logged in");
+    
+    // Update local driver data
+    Object.assign(currentDriver, data);
+    
+    if (supabaseClient) {
+      try {
+        var metaData = Object.assign({}, data);
+        await supabaseClient.auth.updateUser({ data: metaData });
+      } catch (err) {
+        console.warn('Supabase profile update failed', err);
+      }
+    }
+    
+    saveDriverToDB(currentDriver);
+    saveDriver(currentDriver);
+  }
+  
+  async function updateAccount(data) {
+    if (!currentDriver) throw new Error("Not logged in");
+    
+    var email = data.email ? data.email.trim() : '';
+    var currentPassword = data.current_password || '';
+    var newPassword = data.new_password || '';
+    
+    if (email && email !== currentDriver.email) {
+      // Require current password verification
+      if (!currentPassword) {
+        throw new Error("Current password is required to change email.");
+      }
+      
+      if (supabaseClient) {
+        // Verify current password by signing in again
+        var res = await supabaseClient.auth.signInWithPassword({
+          email: currentDriver.email,
+          password: currentPassword
+        });
+        if (res.error) throw new Error("Incorrect current password.");
+        
+        // Update email
+        var updateRes = await supabaseClient.auth.updateUser({ email: email });
+        if (updateRes.error) throw updateRes.error;
+      } else {
+        // Local verification
+        if (currentDriver.password && currentDriver.password !== currentPassword) {
+          throw new Error("Incorrect current password.");
+        }
+      }
+      currentDriver.email = email;
+    }
+    
+    if (newPassword) {
+      await updatePassword(newPassword);
+    } else {
+      saveDriverToDB(currentDriver);
+      saveDriver(currentDriver);
+    }
+  }
+
   function logoutDriver() {
     if (supabaseClient) {
       try { supabaseClient.auth.signOut(); } catch (e) {}
@@ -461,23 +521,68 @@ window.HER_CONFIG = window.HER_CONFIG || {
       }
     });
 
-    // Password Reveal logic
-    var revealBtns = document.querySelectorAll('.btn-reveal');
-    revealBtns.forEach(function (btn) {
-      btn.addEventListener('click', function () {
-        var wrap = btn.closest('.password-wrap');
-        if (wrap) {
-          var input = wrap.querySelector('input');
-          if (input) {
-            if (input.type === 'password') {
-              input.type = 'text';
-              btn.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"></path><line x1="1" y1="1" x2="23" y2="23"></line></svg>';
-            } else {
-              input.type = 'password';
-              btn.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle></svg>';
-            }
+    // Password Reveal logic (Event Delegation)
+    document.addEventListener('click', function(e) {
+      var btn = e.target.closest('.btn-reveal');
+      if (!btn) return;
+      e.preventDefault();
+      var wrap = btn.closest('.password-wrap');
+      if (wrap) {
+        var input = wrap.querySelector('input');
+        if (input) {
+          if (input.type === 'password') {
+            input.type = 'text';
+            btn.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"></path><line x1="1" y1="1" x2="23" y2="23"></line></svg>';
+          } else {
+            input.type = 'password';
+            btn.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle></svg>';
           }
         }
+      }
+    });
+
+    // Profile & Account Dashboard UI
+    var dashboardView = document.getElementById('portal-dashboard-view');
+    var profileView = document.getElementById('portal-profile-view');
+    var accountView = document.getElementById('portal-account-view');
+    var btnEditProfile = document.getElementById('btn-edit-profile');
+    var btnAccountSettings = document.getElementById('btn-account-settings');
+    var backBtns = document.querySelectorAll('.btn-back-dashboard');
+
+    if (btnEditProfile) {
+      btnEditProfile.addEventListener('click', function() {
+        dashboardView.style.display = 'none';
+        if (accountView) accountView.style.display = 'none';
+        if (profileView) {
+          profileView.style.display = 'block';
+          // Prefill
+          if (currentDriver) {
+            document.getElementById('edit-alias').value = currentDriver.alias || '';
+            document.getElementById('edit-pronouns').value = currentDriver.pronouns || '';
+            document.getElementById('edit-number').value = currentDriver.carNumber || '';
+            document.getElementById('edit-sim').value = currentDriver.sim || 'iRacing';
+            document.getElementById('edit-division').value = currentDriver.division || 'Spec Racing';
+            document.getElementById('edit-discord').value = currentDriver.discord || '';
+            document.getElementById('edit-twitch').value = currentDriver.twitch || '';
+            document.getElementById('edit-telemetry').value = currentDriver.telemetryId || '';
+          }
+        }
+      });
+    }
+
+    if (btnAccountSettings) {
+      btnAccountSettings.addEventListener('click', function() {
+        dashboardView.style.display = 'none';
+        if (profileView) profileView.style.display = 'none';
+        if (accountView) accountView.style.display = 'block';
+      });
+    }
+
+    backBtns.forEach(function(btn) {
+      btn.addEventListener('click', function() {
+        if (profileView) profileView.style.display = 'none';
+        if (accountView) accountView.style.display = 'none';
+        dashboardView.style.display = 'block';
       });
     });
 
@@ -736,6 +841,86 @@ window.HER_CONFIG = window.HER_CONFIG || {
         var portal = document.getElementById('members');
         if (portal) portal.scrollIntoView({ behavior: 'smooth' });
       }, 100);
+    }
+
+    // Profile Settings Form
+    var formProfile = document.getElementById('form-edit-profile');
+    if (formProfile) {
+      formProfile.addEventListener('submit', async function(e) {
+        e.preventDefault();
+        var errBox = document.getElementById('edit-profile-error');
+        var successBox = document.getElementById('edit-profile-success');
+        if (errBox) errBox.textContent = '';
+        if (successBox) successBox.style.display = 'none';
+
+        var data = {
+          alias: document.getElementById('edit-alias').value.trim(),
+          pronouns: document.getElementById('edit-pronouns').value.trim(),
+          carNumber: document.getElementById('edit-number').value.trim(),
+          sim: document.getElementById('edit-sim').value,
+          division: document.getElementById('edit-division').value,
+          discord: document.getElementById('edit-discord').value.trim(),
+          twitch: document.getElementById('edit-twitch').value.trim(),
+          telemetryId: document.getElementById('edit-telemetry').value.trim()
+        };
+
+        if (!data.alias) {
+          if (errBox) errBox.textContent = 'Driver Name / Alias is required.';
+          return;
+        }
+
+        try {
+          await updateProfile(data);
+          if (successBox) {
+            successBox.textContent = 'Profile updated successfully!';
+            successBox.style.display = 'block';
+          }
+        } catch (err) {
+          if (errBox) errBox.textContent = err.message || 'Error updating profile.';
+        }
+      });
+    }
+
+    // Account Settings Form
+    var formAccount = document.getElementById('form-edit-account');
+    if (formAccount) {
+      formAccount.addEventListener('submit', async function(e) {
+        e.preventDefault();
+        var errBox = document.getElementById('edit-account-error');
+        var successBox = document.getElementById('edit-account-success');
+        if (errBox) errBox.textContent = '';
+        if (successBox) successBox.style.display = 'none';
+
+        var email = document.getElementById('edit-email').value.trim();
+        var currentPassword = document.getElementById('edit-account-password').value;
+        var newPassword = document.getElementById('edit-new-password').value;
+        var confirmPassword = document.getElementById('edit-confirm-password').value;
+
+        if (newPassword && newPassword !== confirmPassword) {
+          if (errBox) errBox.textContent = 'New passwords do not match.';
+          return;
+        }
+
+        try {
+          await updateAccount({
+            email: email,
+            current_password: currentPassword,
+            new_password: newPassword
+          });
+          
+          if (successBox) {
+            var msg = 'Account updated successfully!';
+            if (email && email !== currentDriver.email) {
+              msg += ' Please check your new email to confirm the change.';
+            }
+            successBox.textContent = msg;
+            successBox.style.display = 'block';
+          }
+          formAccount.reset();
+        } catch (err) {
+          if (errBox) errBox.textContent = err.message || 'Error updating account.';
+        }
+      });
     }
 
     // Nav auth button -> scroll to members section
