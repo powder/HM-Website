@@ -143,7 +143,7 @@ window.HER_CONFIG = window.HER_CONFIG || {
     }
 
     saveDriverToDB(profile);
-    saveDriver(profile);
+    // saveDriver(profile); // Do not auto-login, wait for confirmation
     return profile;
   }
 
@@ -226,6 +226,41 @@ window.HER_CONFIG = window.HER_CONFIG || {
     };
     saveDriverToDB(discordProfile);
     saveDriver(discordProfile);
+  }
+
+  async function sendPasswordReset(email) {
+    if (!email) throw new Error("Please enter your email.");
+    if (supabaseClient) {
+      var res = await supabaseClient.auth.resetPasswordForEmail(email, {
+        redirectTo: window.location.origin + window.location.pathname + '#reset-password',
+      });
+      if (res.error) throw res.error;
+      return true;
+    }
+    // Mock local flow
+    var existing = getDriverByEmail(email);
+    if (!existing) throw new Error("Email not found.");
+    return true; // pretend we sent it
+  }
+
+  async function updatePassword(newPassword) {
+    if (!newPassword) throw new Error("Please enter a new password.");
+    if (supabaseClient) {
+      var res = await supabaseClient.auth.updateUser({ password: newPassword });
+      if (res.error) throw res.error;
+      return true;
+    }
+    // Mock local flow
+    if (currentDriver) {
+      currentDriver.password = newPassword;
+      saveDriverToDB(currentDriver);
+      saveDriver(currentDriver);
+      return true;
+    } else {
+      // In local dev, simulating an unauthenticated token reset:
+      // Let's just say we need to be logged in for the mock to work unless we track tokens.
+      throw new Error("Must be logged in to update password in local mode.");
+    }
   }
 
   function logoutDriver() {
@@ -518,6 +553,15 @@ window.HER_CONFIG = window.HER_CONFIG || {
           twitch: twitchInput ? twitchInput.value.trim() : '',
           telemetryId: telemInput ? telemInput.value.trim() : ''
         });
+        
+        var successBox = document.getElementById('signup-success');
+        if (successBox) {
+          successBox.textContent = 'Registration successful! Please check your email to confirm your account.';
+          successBox.style.display = 'block';
+        }
+        var formSignupEl = document.getElementById('form-signup');
+        if (formSignupEl) formSignupEl.reset();
+        
       } catch (err) {
         if (errBox) errBox.textContent = err.message || 'Error registering driver.';
       }
@@ -578,6 +622,120 @@ window.HER_CONFIG = window.HER_CONFIG || {
         e.preventDefault();
         logoutDriver();
       });
+    }
+
+    // Password Reset UI Handlers
+    var forgotLink = document.getElementById('link-forgot-password');
+    var backLoginLink = document.getElementById('link-back-login');
+    var formForgot = document.getElementById('form-forgot-password');
+    var formReset = document.getElementById('form-reset-password');
+    
+    if (forgotLink && formLogin && formForgot) {
+      forgotLink.addEventListener('click', function(e) {
+        e.preventDefault();
+        formLogin.style.display = 'none';
+        formForgot.style.display = 'grid';
+      });
+    }
+    
+    if (backLoginLink && formLogin && formForgot) {
+      backLoginLink.addEventListener('click', function(e) {
+        e.preventDefault();
+        formForgot.style.display = 'none';
+        formLogin.style.display = 'grid';
+      });
+    }
+
+    var btnForgot = document.getElementById('btn-submit-forgot');
+    async function handleForgot(e) {
+      if (e) e.preventDefault();
+      var errBox = document.getElementById('forgot-error');
+      if (errBox) errBox.textContent = '';
+      
+      var emailInput = document.getElementById('forgot-email');
+      var email = emailInput ? emailInput.value.trim() : '';
+      if (!email) {
+        if (errBox) errBox.textContent = 'Please enter your email.';
+        return;
+      }
+      
+      try {
+        await sendPasswordReset(email);
+        var successBox = document.getElementById('signup-success');
+        if (successBox) {
+          successBox.textContent = 'Password reset link sent! Check your email.';
+          successBox.style.display = 'block';
+        }
+        if (formForgot) formForgot.reset();
+        formForgot.style.display = 'none';
+        formLogin.style.display = 'grid';
+      } catch (err) {
+        if (errBox) errBox.textContent = err.message || 'Error sending reset link.';
+      }
+    }
+    
+    if (btnForgot) btnForgot.addEventListener('click', handleForgot);
+    if (formForgot) formForgot.addEventListener('submit', handleForgot);
+
+    var btnReset = document.getElementById('btn-submit-reset');
+    async function handleReset(e) {
+      if (e) e.preventDefault();
+      var errBox = document.getElementById('reset-error');
+      if (errBox) errBox.textContent = '';
+      
+      var passInput = document.getElementById('reset-password');
+      var confInput = document.getElementById('reset-confirm');
+      var password = passInput ? passInput.value : '';
+      var confirm = confInput ? confInput.value : '';
+      
+      if (!password) {
+        if (errBox) errBox.textContent = 'Please enter a new password.';
+        return;
+      }
+      if (password !== confirm) {
+        if (errBox) errBox.textContent = 'Passwords do not match.';
+        return;
+      }
+      
+      try {
+        await updatePassword(password);
+        var successBox = document.getElementById('signup-success');
+        if (successBox) {
+          successBox.textContent = 'Password updated successfully! You can now log in.';
+          successBox.style.display = 'block';
+        }
+        if (formReset) {
+          formReset.reset();
+          formReset.style.display = 'none';
+        }
+        if (formLogin) formLogin.style.display = 'grid';
+        
+        // clean up hash
+        if (window.history.replaceState) {
+          window.history.replaceState(null, null, window.location.pathname);
+        }
+      } catch (err) {
+        if (errBox) errBox.textContent = err.message || 'Error updating password.';
+      }
+    }
+    
+    if (btnReset) btnReset.addEventListener('click', handleReset);
+    if (formReset) formReset.addEventListener('submit', handleReset);
+
+    // Check URL for reset mode
+    var hash = window.location.hash;
+    if (hash.includes('type=recovery') || hash.includes('#reset-password')) {
+      if (tabSignup) tabSignup.classList.remove('active');
+      if (tabLogin) tabLogin.classList.remove('active');
+      if (formSignup) formSignup.style.display = 'none';
+      if (formLogin) formLogin.style.display = 'none';
+      if (formReset) formReset.style.display = 'grid';
+      
+      // Auto-scroll to portal
+      setTimeout(function() {
+        var portal = document.getElementById('members');
+        if (portal) portal.scrollIntoView({ behavior: 'smooth' });
+      }, 100);
     }
 
     // Nav auth button -> scroll to members section

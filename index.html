@@ -329,9 +329,49 @@
                       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle></svg>
                     </button>
                   </div>
+                  <div style="text-align: right; margin-top: .25rem;">
+                    <a href="#" id="link-forgot-password" style="font-size: .85rem;">Forgot Password?</a>
+                  </div>
                 </div>
                 <p class="form-error" id="login-error"></p>
                 <button type="submit" id="btn-submit-login" class="btn">Log In to Paddock</button>
+              </form>
+
+              <!-- Forgot Password Form (Hidden by default) -->
+              <form class="portal-form" id="form-forgot-password" style="display: none;" onsubmit="return false;">
+                <div class="form-group">
+                  <label for="forgot-email">Enter your email to reset password</label>
+                  <input type="email" id="forgot-email" name="email" placeholder="driver@email.com" required>
+                </div>
+                <p class="form-error" id="forgot-error"></p>
+                <button type="submit" id="btn-submit-forgot" class="btn">Send Reset Link</button>
+                <div style="text-align: center; margin-top: 1rem;">
+                  <a href="#" id="link-back-login" style="font-size: .85rem;">Back to Login</a>
+                </div>
+              </form>
+
+              <!-- Reset Password Form (Hidden by default) -->
+              <form class="portal-form" id="form-reset-password" style="display: none;" onsubmit="return false;">
+                <div class="form-group">
+                  <label for="reset-password">New Password</label>
+                  <div class="password-wrap">
+                    <input type="password" id="reset-password" name="password" placeholder="••••••••" required minlength="4">
+                    <button type="button" class="btn-reveal" aria-label="Show password" tabindex="-1">
+                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle></svg>
+                    </button>
+                  </div>
+                </div>
+                <div class="form-group">
+                  <label for="reset-confirm">Confirm New Password</label>
+                  <div class="password-wrap">
+                    <input type="password" id="reset-confirm" name="confirm" placeholder="••••••••" required minlength="4">
+                    <button type="button" class="btn-reveal" aria-label="Show password" tabindex="-1">
+                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle></svg>
+                    </button>
+                  </div>
+                </div>
+                <p class="form-error" id="reset-error"></p>
+                <button type="submit" id="btn-submit-reset" class="btn">Update Password</button>
               </form>
             </div>
 
