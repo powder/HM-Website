@@ -533,7 +533,6 @@
         html += '<tr data-driver-id="' + escapeHTML(d.id) + '">' +
           '<td><strong>' + escapeHTML(d.alias) + '</strong>' + (d.pronouns ? ' <small style="color:var(--text-muted);">(' + escapeHTML(d.pronouns) + ')</small>' : '') + '</td>' +
           '<td><span class="driver-num-plate">#' + escapeHTML(d.carNumber || '00') + '</span></td>' +
-          '<td style="font-family:var(--font-mono); font-size:0.85rem;">' + escapeHTML(d.email || '') + '</td>' +
           '<td><span class="div-pill">' + escapeHTML(d.division || 'Spec Racing') + '</span></td>' +
           '<td><span class="sim-badge">' + escapeHTML(d.sim || 'iRacing') + '</span></td>' +
           '<td>' + isAdminPill + '</td>' +
@@ -656,7 +655,7 @@
     if (navAdmin) navAdmin.style.display = isAdmin ? 'list-item' : 'none';
     if (dashAdminBtn) dashAdminBtn.style.display = isAdmin ? 'inline-flex' : 'none';
     if (adminUserDisplay) {
-      adminUserDisplay.textContent = currentDriver ? currentDriver.email : 'nanenj@gmail.com';
+      adminUserDisplay.textContent = currentDriver ? currentDriver.alias : 'Admin';
     }
     if (adminUnauth && adminAuth) {
       if (isAdmin) {

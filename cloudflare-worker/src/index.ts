@@ -115,7 +115,11 @@ app.get('/api/roster', async (c) => {
        ORDER BY created_at DESC`
     ).all();
 
-    const drivers = ((results || []) as unknown as DriverRecord[]).map(sanitizeDriver);
+    // Emails are private: never expose them on the public roster.
+    const drivers = ((results || []) as unknown as DriverRecord[]).map((row) => {
+      const { email: _email, ...publicDriver } = sanitizeDriver(row);
+      return publicDriver;
+    });
     return c.json({ success: true, drivers });
   } catch (err: any) {
     console.error('Failed to fetch roster from D1:', err);
