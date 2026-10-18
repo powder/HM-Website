@@ -37,25 +37,55 @@
   // --- SPA Router ---
   var viewHome = document.getElementById('view-home');
   var viewConduct = document.getElementById('view-conduct');
+  var viewCalendar = document.getElementById('view-calendar');
+  var viewDivisions = document.getElementById('view-divisions');
+  var viewAdmin = document.getElementById('view-admin');
+  var allViews = [viewHome, viewConduct, viewCalendar, viewDivisions, viewAdmin];
   var navLinks = document.querySelectorAll('.nav a, .site-footer a');
+
+  function setActiveView(targetView) {
+    allViews.forEach(function (v) {
+      if (v) v.classList.remove('active');
+    });
+    if (targetView) targetView.classList.add('active');
+  }
 
   function handleRoute() {
     var rawHash = window.location.hash || '';
     var hash = rawHash.toLowerCase();
 
     if (hash === '#conduct') {
-      // Activate Code of Conduct SPA view
-      if (viewHome) viewHome.classList.remove('active');
-      if (viewConduct) viewConduct.classList.add('active');
-
+      setActiveView(viewConduct);
       document.title = 'Code of Conduct — Her Motorsport';
       window.scrollTo({ top: 0, behavior: 'smooth' });
       updateActiveNav('#conduct');
+    } else if (hash === '#calendar') {
+      setActiveView(viewCalendar);
+      document.title = 'Race Calendar — Her Motorsport';
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+      updateActiveNav('#calendar');
+      if (window.HerMembers && window.HerMembers.renderCalendar) {
+        window.HerMembers.renderCalendar();
+      }
+    } else if (hash === '#divisions') {
+      setActiveView(viewDivisions);
+      document.title = 'Championship Divisions — Her Motorsport';
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+      updateActiveNav('#divisions');
+      if (window.HerMembers && window.HerMembers.renderDivisions) {
+        window.HerMembers.renderDivisions();
+      }
+    } else if (hash === '#admin') {
+      setActiveView(viewAdmin);
+      document.title = 'Race Control Admin — Her Motorsport';
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+      updateActiveNav('#admin');
+      if (window.HerMembers && window.HerMembers.initAdmin) {
+        window.HerMembers.initAdmin();
+      }
     } else {
-      // Activate Main Paddock SPA view
-      if (viewConduct) viewConduct.classList.remove('active');
-      if (viewHome) viewHome.classList.add('active');
-
+      // Main Paddock SPA view
+      setActiveView(viewHome);
       document.title = 'Her Motorsport — Sim Racing Community';
       updateActiveNav(hash || '#about');
 

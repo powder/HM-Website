@@ -1,0 +1,36 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "hm-website-worker",
+  "main": "src/index.ts",
+  "compatibility_date": "2026-10-01",
+  "compatibility_flags": ["nodejs_compat"],
+
+  "routes": [
+    { "pattern": "hermotorsport.com", "custom_domain": true },
+    { "pattern": "www.hermotorsport.com", "custom_domain": true }
+  ],
+  "workers_dev": true,
+
+  // Static Assets Binding: Serves HTML, CSS, JS, and images from public/
+  "assets": {
+    "directory": "./public",
+    "binding": "ASSETS",
+    "html_handling": "auto-trailing-slash",
+    "not_found_handling": "single-page-application"
+  },
+
+  // Cloudflare D1 Edge SQLite Database
+  // When running locally (`wrangler dev`), Wrangler creates a local SQLite database automatically.
+  // When deploying to Cloudflare, replace database_id with your ID from: npx wrangler d1 create hm-db
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "hm-db",
+      "database_id": "14888019-3b31-493a-9376-0d86b18478c7"
+    }
+  ],
+
+  "vars": {
+    "APP_NAME": "Her Motorsport"
+  }
+}

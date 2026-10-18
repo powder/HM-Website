@@ -1,14 +1,9 @@
 /**
- * Her Motorsport — Robust Serverless & Local Member Management
+ * Her Motorsport — Cloudflare Worker Edge & Member Management
  *
- * Works 100% locally out-of-the-box (zero server setup needed),
- * and automatically synchronizes with Supabase when API keys are configured.
+ * Integrates directly with Cloudflare Worker D1 Edge Database API (/api/*)
+ * with automatic fallback to local session cache for smooth offline development.
  */
-
-window.HER_CONFIG = window.HER_CONFIG || {
-  supabaseUrl: 'https://byifghjfifctheadqxbb.supabase.co',
-  supabaseAnonKey: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJ5aWZnaGpmaWZjdGhlYWRxeGJiIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTE2NjAyNDIsImV4cCI6MjEwNzIzNjI0Mn0.B9WJ3cfm2J7Ur6ohxKYnfZbJtte9HvMDqm-QGJxS1hs'
-};
 
 (function () {
   'use strict';
@@ -16,10 +11,8 @@ window.HER_CONFIG = window.HER_CONFIG || {
   var STORAGE_KEY = 'hm_driver_session';
   var DB_KEY = 'hm_registered_drivers';
   var memoryStorage = {};
-  var memoryDB = {};
-  var supabaseClient = null;
 
-  // Safe storage wrapper (handles file:/// security restrictions gracefully)
+  // Safe storage wrapper
   function safeGet(key) {
     try {
       var val = localStorage.getItem(key);
@@ -61,18 +54,6 @@ window.HER_CONFIG = window.HER_CONFIG || {
     }
   }
 
-  // Initialize Supabase if SDK is present and keys are provided
-  if (window.supabase && window.HER_CONFIG.supabaseUrl && window.HER_CONFIG.supabaseAnonKey) {
-    try {
-      supabaseClient = window.supabase.createClient(
-        window.HER_CONFIG.supabaseUrl,
-        window.HER_CONFIG.supabaseAnonKey
-      );
-    } catch (err) {
-      console.warn('Supabase not configured, running in local paddock mode:', err);
-    }
-  }
-
   // Current session
   var currentDriver = getSavedDriver();
 
@@ -95,7 +76,14 @@ window.HER_CONFIG = window.HER_CONFIG || {
     updateUI();
   }
 
-  // --- Auth Handlers ---
+  function isCurrentDriverAdmin() {
+    if (!currentDriver) return false;
+    if (currentDriver.email && currentDriver.email.toLowerCase() === 'nanenj@gmail.com') return true;
+    if (currentDriver.isAdmin || currentDriver.is_admin === 1) return true;
+    return false;
+  }
+
+  // --- Edge API Handlers ---
 
   async function registerDriver(data) {
     var alias = (data.alias || '').trim() || 'Paddock Driver';
@@ -109,8 +97,7 @@ window.HER_CONFIG = window.HER_CONFIG || {
     var twitch = (data.twitch || '').trim();
     var telemetryId = (data.telemetryId || '').trim() || ('SIM-' + Math.floor(10000 + Math.random() * 90000));
 
-    var profile = {
-      id: 'driver_' + Date.now(),
+    var payload = {
       alias: alias,
       email: email,
       password: password,
@@ -120,214 +107,535 @@ window.HER_CONFIG = window.HER_CONFIG || {
       pronouns: pronouns,
       discord: discord,
       twitch: twitch,
-      telemetryId: telemetryId,
-      status: 'Active Driver',
-      joinedDate: new Date().toLocaleDateString('en-US', { month: 'short', year: 'numeric' })
+      telemetryId: telemetryId
     };
 
-    if (supabaseClient) {
-      try {
-        var metaData = Object.assign({}, profile);
-        delete metaData.password;
-        var res = await supabaseClient.auth.signUp({
-          email: email,
-          password: password,
-          options: { data: metaData }
-        });
-        if (res.data && res.data.user) {
-          profile.id = res.data.user.id;
-        }
-      } catch (err) {
-        console.warn('Supabase signup error, continuing locally:', err);
-      }
-    }
+    try {
+      var res = await fetch('/api/auth/register', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+      var result = await res.json();
+      if (!result.success) throw new Error(result.message || 'Registration failed.');
 
-    saveDriverToDB(profile);
-    // saveDriver(profile); // Do not auto-login, wait for confirmation
-    return profile;
+      var profile = result.driver;
+      saveDriverToDB(profile);
+      fetchRoster(); // refresh global roster from edge
+      return profile;
+    } catch (err) {
+      // Local fallback if API is unreachable (e.g. static preview)
+      if (err.message && err.message.includes('already exists')) {
+        throw err;
+      }
+      var fallbackProfile = {
+        id: 'driver_' + Date.now(),
+        alias: alias,
+        email: email,
+        password: password,
+        carNumber: carNumber,
+        sim: sim,
+        division: division,
+        pronouns: pronouns,
+        discord: discord,
+        twitch: twitch,
+        telemetryId: telemetryId,
+        status: 'Active Driver',
+        joinedDate: new Date().toLocaleDateString('en-US', { month: 'short', year: 'numeric' })
+      };
+      saveDriverToDB(fallbackProfile);
+      renderLocalRoster();
+      return fallbackProfile;
+    }
   }
 
   async function loginDriver(email, password) {
     email = (email || '').trim();
     if (!email) throw new Error('Please enter your email.');
 
-    if (supabaseClient) {
-      try {
-        var res = await supabaseClient.auth.signInWithPassword({
-          email: email,
-          password: password
-        });
-        if (res.error) throw res.error;
-        var meta = (res.data.user && res.data.user.user_metadata) || {};
-        var remoteProfile = {
-          id: res.data.user.id,
-          email: email,
-          alias: meta.alias || email.split('@')[0],
-          discord: meta.discord || '',
-          twitch: meta.twitch || '',
-          carNumber: meta.carNumber || '77',
-          sim: meta.sim || 'iRacing',
-          division: meta.division || 'Spec Racing',
-          pronouns: meta.pronouns || 'she/her',
-          telemetryId: meta.telemetryId || 'SIM-88412',
-          status: 'Active Driver',
-          joinedDate: '2026'
-        };
-        saveDriver(remoteProfile);
-        return remoteProfile;
-      } catch (err) {
-        throw err;
-      }
-    }
+    try {
+      var res = await fetch('/api/auth/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: email, password: password })
+      });
+      var result = await res.json();
+      if (!result.success) throw new Error(result.message || 'Invalid login details.');
 
-    // Local authentication fallback
-    var existing = getDriverByEmail(email);
-    if (existing) {
-      if (existing.password && existing.password !== password) {
-        throw new Error('Invalid login details.');
+      saveDriver(result.driver);
+      return result.driver;
+    } catch (err) {
+      // Fallback to local DB if API offline
+      var existing = getDriverByEmail(email);
+      if (existing) {
+        if (existing.password && existing.password !== password) {
+          throw new Error('Invalid login details.');
+        }
+        saveDriver(existing);
+        return existing;
       }
-      saveDriver(existing);
-      return existing;
+      throw err;
     }
-
-    throw new Error('Driver not found. Please register a pass first.');
   }
 
   async function loginWithDiscord() {
-    if (supabaseClient) {
-      try {
-        await supabaseClient.auth.signInWithOAuth({
-          provider: 'discord',
-          options: { redirectTo: window.location.origin }
-        });
-        return;
-      } catch (e) {
-        console.warn('Discord OAuth fallback to instant mode:', e);
-      }
-    }
-
     var handle = prompt('Connect with Discord:\nEnter your Discord username:', 'SpeedQueen#1234');
     if (!handle) handle = 'Driver' + Math.floor(100 + Math.random() * 900);
     var cleanName = handle.replace(/[^a-zA-Z0-9]/g, '');
 
     var discordProfile = {
-      id: 'discord_' + Date.now(),
       alias: handle,
       email: (cleanName || 'driver').toLowerCase() + '@discord.sim',
+      password: 'discord-auth-token',
       carNumber: String(Math.floor(1 + Math.random() * 99)).padStart(2, '0'),
       sim: 'iRacing',
       division: 'Spec Racing',
       pronouns: 'she/they',
-      discord: '',
+      discord: handle,
       twitch: '',
-      telemetryId: 'DISC-' + Math.floor(1000 + Math.random() * 9000),
-      status: 'Discord Verified',
-      joinedDate: new Date().toLocaleDateString('en-US', { month: 'short', year: 'numeric' })
+      telemetryId: 'DISC-' + Math.floor(1000 + Math.random() * 9000)
     };
-    saveDriverToDB(discordProfile);
-    saveDriver(discordProfile);
+
+    try {
+      var reg = await registerDriver(discordProfile);
+      saveDriver(reg);
+    } catch (e) {
+      saveDriverToDB(discordProfile);
+      saveDriver(discordProfile);
+    }
   }
 
   async function sendPasswordReset(email) {
     if (!email) throw new Error("Please enter your email.");
-    if (supabaseClient) {
-      var res = await supabaseClient.auth.resetPasswordForEmail(email, {
-        redirectTo: window.location.origin + window.location.pathname + '#reset-password',
+    try {
+      var res = await fetch('/api/auth/forgot-password', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: email })
       });
-      if (res.error) throw res.error;
+      var result = await res.json();
+      if (!result.success) throw new Error(result.message || 'Error processing request.');
+      return true;
+    } catch (err) {
+      var existing = getDriverByEmail(email);
+      if (!existing) throw new Error("Email not found.");
       return true;
     }
-    // Mock local flow
-    var existing = getDriverByEmail(email);
-    if (!existing) throw new Error("Email not found.");
-    return true; // pretend we sent it
   }
 
   async function updatePassword(newPassword) {
     if (!newPassword) throw new Error("Please enter a new password.");
-    if (supabaseClient) {
-      var res = await supabaseClient.auth.updateUser({ password: newPassword });
-      if (res.error) throw res.error;
-      return true;
-    }
-    // Mock local flow
-    if (currentDriver) {
-      currentDriver.password = newPassword;
-      saveDriverToDB(currentDriver);
-      saveDriver(currentDriver);
-      return true;
-    } else {
-      // In local dev, simulating an unauthenticated token reset:
-      // Let's just say we need to be logged in for the mock to work unless we track tokens.
-      throw new Error("Must be logged in to update password in local mode.");
-    }
+    if (!currentDriver) throw new Error("Must be logged in to update password.");
+
+    return updateAccount({ new_password: newPassword });
   }
 
   async function updateProfile(data) {
     if (!currentDriver) throw new Error("Not logged in");
-    
-    // Update local driver data
-    Object.assign(currentDriver, data);
-    
-    if (supabaseClient) {
-      try {
-        var metaData = Object.assign({}, data);
-        await supabaseClient.auth.updateUser({ data: metaData });
-      } catch (err) {
-        console.warn('Supabase profile update failed', err);
+
+    try {
+      var payload = Object.assign({ id: currentDriver.id }, data);
+      var res = await fetch('/api/driver/profile', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+      var result = await res.json();
+      if (result.success && result.driver) {
+        saveDriver(result.driver);
+        fetchRoster();
+        return;
       }
+    } catch (e) {
+      console.warn('API update failed, updating locally:', e);
     }
-    
+
+    Object.assign(currentDriver, data);
+    saveDriverToDB(currentDriver);
+    saveDriver(currentDriver);
+    renderLocalRoster();
+  }
+
+  async function updateAccount(data) {
+    if (!currentDriver) throw new Error("Not logged in");
+
+    try {
+      var payload = Object.assign({ id: currentDriver.id }, data);
+      var res = await fetch('/api/driver/account', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+      var result = await res.json();
+      if (!result.success) throw new Error(result.message || 'Error updating account.');
+      if (result.driver) {
+        saveDriver(result.driver);
+      }
+      return;
+    } catch (e) {
+      if (e.message && e.message.includes('password')) throw e;
+      console.warn('API account update failed, falling back locally:', e);
+    }
+
+    if (data.email) currentDriver.email = data.email;
+    if (data.new_password) currentDriver.password = data.new_password;
     saveDriverToDB(currentDriver);
     saveDriver(currentDriver);
   }
-  
-  async function updateAccount(data) {
-    if (!currentDriver) throw new Error("Not logged in");
-    
-    var email = data.email ? data.email.trim() : '';
-    var currentPassword = data.current_password || '';
-    var newPassword = data.new_password || '';
-    
-    if (email && email !== currentDriver.email) {
-      // Require current password verification
-      if (!currentPassword) {
-        throw new Error("Current password is required to change email.");
+
+  function logoutDriver() {
+    saveDriver(null);
+  }
+
+  // --- Global Grid Roster Fetching ---
+
+  async function fetchRoster() {
+    try {
+      var res = await fetch('/api/roster');
+      var data = await res.json();
+      if (data.success && Array.isArray(data.drivers)) {
+        renderRoster(data.drivers);
+        return;
       }
-      
-      if (supabaseClient) {
-        // Verify current password by signing in again
-        var res = await supabaseClient.auth.signInWithPassword({
-          email: currentDriver.email,
-          password: currentPassword
-        });
-        if (res.error) throw new Error("Incorrect current password.");
-        
-        // Update email
-        var updateRes = await supabaseClient.auth.updateUser({ email: email });
-        if (updateRes.error) throw updateRes.error;
-      } else {
-        // Local verification
-        if (currentDriver.password && currentDriver.password !== currentPassword) {
-          throw new Error("Incorrect current password.");
-        }
-      }
-      currentDriver.email = email;
+    } catch (e) {
+      // Fallback to local
     }
-    
-    if (newPassword) {
-      await updatePassword(newPassword);
-    } else {
-      saveDriverToDB(currentDriver);
-      saveDriver(currentDriver);
+    renderLocalRoster();
+  }
+
+  function renderLocalRoster() {
+    var db = {};
+    try {
+      db = JSON.parse(safeGet(DB_KEY) || '{}');
+    } catch (e) {}
+    var drivers = Object.values(db);
+    renderRoster(drivers);
+  }
+
+  function renderRoster(drivers) {
+    var tbody = document.getElementById('roster-tbody');
+    if (!tbody) return;
+
+    if (!drivers || drivers.length === 0) {
+      tbody.innerHTML = '<tr><td colspan="6" class="roster-empty">No drivers registered yet. Register your Paddock Pass above to claim the #1 grid spot!</td></tr>';
+      return;
+    }
+
+    var html = '';
+    drivers.forEach(function (d, idx) {
+      var pos = 'P' + (idx + 1);
+      var twitchHtml = d.twitch ? '<a class="twitch-link" href="https://twitch.tv/' + escapeHTML(d.twitch.replace('@', '')) + '" target="_blank" rel="noopener"><svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor" aria-hidden="true"><path d="M11.571 4.714h1.715v5.143H11.57zm4.715 0H18v5.143h-1.714zM6 0L1.714 4.286v15.428h5.143V24l4.286-4.286h3.428L22.286 12V0zm14.571 11.143l-3.428 3.428h-3.429l-3 3v-3H6.857V1.714h13.714z"/></svg>' + escapeHTML(d.twitch) + '</a>' : '<span style="color: var(--text-subtle);">—</span>';
+      
+      html += '<tr>' +
+        '<td class="roster-pos"><span class="pos-badge">' + pos + '</span></td>' +
+        '<td class="roster-driver"><strong class="driver-name">' + escapeHTML(d.alias) + '</strong>' + (d.pronouns ? ' <span class="roster-pronouns">' + escapeHTML(d.pronouns) + '</span>' : '') + '</td>' +
+        '<td class="roster-number"><span class="driver-num-plate">#' + escapeHTML(d.carNumber || '00') + '</span></td>' +
+        '<td class="roster-division"><span class="div-pill">' + escapeHTML(d.division || 'Spec Racing') + '</span></td>' +
+        '<td class="roster-sim"><span class="sim-badge">' + escapeHTML(d.sim || 'iRacing') + '</span></td>' +
+        '<td class="roster-twitch">' + twitchHtml + '</td>' +
+      '</tr>';
+    });
+    tbody.innerHTML = html;
+  }
+
+  // --- Events, Calendar & Simulator Filtering ---
+
+  var currentEvents = [];
+  var currentSimFilter = 'all';
+
+  function formatEventDate(dateStr) {
+    if (!dateStr) return '';
+    var d = new Date(dateStr + 'T00:00:00');
+    if (isNaN(d.getTime())) return dateStr;
+    return d.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' });
+  }
+
+  async function fetchEvents(sim) {
+    if (sim !== undefined) currentSimFilter = sim;
+    try {
+      var url = '/api/events' + (currentSimFilter && currentSimFilter !== 'all' ? '?sim=' + encodeURIComponent(currentSimFilter) : '');
+      var res = await fetch(url);
+      var data = await res.json();
+      if (data.success && Array.isArray(data.events)) {
+        currentEvents = data.events;
+        renderScheduleTable(currentEvents);
+        renderCalendarGrid(currentEvents);
+        return;
+      }
+    } catch (e) {
+      console.warn('Could not fetch events from edge API, using defaults:', e);
     }
   }
 
-  function logoutDriver() {
-    if (supabaseClient) {
-      try { supabaseClient.auth.signOut(); } catch (e) {}
+  function renderScheduleTable(events) {
+    var tbody = document.getElementById('schedule-tbody');
+    if (!tbody) return;
+    if (!events || events.length === 0) {
+      tbody.innerHTML = '<tr><td colspan="6" style="text-align:center; padding: 2.5rem; color: var(--text-muted);">No upcoming race sessions scheduled for this simulator.</td></tr>';
+      return;
     }
-    saveDriver(null);
+    var html = '';
+    events.forEach(function (ev) {
+      var statusColor = ev.status === 'Lobby Open' 
+        ? 'color: var(--telemetry-green); border-color: rgba(46, 204, 113, 0.4);' 
+        : (ev.status === 'Completed' ? 'opacity: 0.5;' : '');
+      
+      html += '<tr>' +
+        '<td><strong>' + escapeHTML(ev.title) + '</strong>' + (ev.notes ? '<br><small style="color:var(--text-subtle);">' + escapeHTML(ev.notes) + '</small>' : '') + '</td>' +
+        '<td>' + escapeHTML(ev.series || 'Open Paddock') + '</td>' +
+        '<td>' + escapeHTML(ev.track) + '</td>' +
+        '<td><span class="sim-badge">' + escapeHTML(ev.sim || 'iRacing') + '</span></td>' +
+        '<td>' + escapeHTML(formatEventDate(ev.event_date)) + ' &bull; ' + escapeHTML(ev.session_time || '') + '</td>' +
+        '<td><span class="spec-pill" style="' + statusColor + '">' + escapeHTML(ev.status || 'Scheduled') + '</span></td>' +
+      '</tr>';
+    });
+    tbody.innerHTML = html;
+  }
+
+  function renderCalendarGrid(events) {
+    var grid = document.getElementById('calendar-cards-grid');
+    if (!grid) return;
+    if (!events || events.length === 0) {
+      grid.innerHTML = '<div style="grid-column: 1 / -1; text-align: center; padding: 3rem; color: var(--text-muted);">No upcoming races found matching the selected simulator.</div>';
+      return;
+    }
+    var html = '';
+    events.forEach(function (ev) {
+      var dateFormatted = formatEventDate(ev.event_date);
+      var statusColor = ev.status === 'Lobby Open' 
+        ? 'color: var(--telemetry-green); border-color: rgba(46, 204, 113, 0.4);' 
+        : (ev.status === 'Completed' ? 'opacity: 0.5;' : '');
+
+      html += '<article class="calendar-card">' +
+        '<div class="calendar-card-date">' +
+          '<span class="date-badge">' + escapeHTML(dateFormatted) + '</span>' +
+          '<span class="time-label">' + escapeHTML(ev.session_time || '8:00 PM EST') + '</span>' +
+        '</div>' +
+        '<h3>' + escapeHTML(ev.title) + '</h3>' +
+        '<div class="calendar-track-info">' +
+          '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16" aria-hidden="true"><circle cx="12" cy="12" r="10"></circle><polygon points="12 6 12 12 16 14"></polygon></svg>' +
+          '<span>' + escapeHTML(ev.track) + '</span>' +
+        '</div>' +
+        (ev.notes ? '<p style="font-size: 0.9rem; color: var(--text-muted); margin: 0.25rem 0;">' + escapeHTML(ev.notes) + '</p>' : '') +
+        '<div class="calendar-meta-row">' +
+          '<span class="spec-pill">' + escapeHTML(ev.series || 'Spec Racing') + '</span>' +
+          '<span class="sim-badge">' + escapeHTML(ev.sim || 'iRacing') + '</span>' +
+          '<span class="spec-pill" style="' + statusColor + '">' + escapeHTML(ev.status || 'Scheduled') + '</span>' +
+        '</div>' +
+      '</article>';
+    });
+    grid.innerHTML = html;
+  }
+
+  // --- Divisions Fetching & Rendering ---
+
+  var currentDivisions = [];
+
+  async function fetchDivisions() {
+    try {
+      var res = await fetch('/api/divisions');
+      var data = await res.json();
+      if (data.success && Array.isArray(data.divisions)) {
+        currentDivisions = data.divisions;
+        renderDivisionsGrid(currentDivisions);
+        return;
+      }
+    } catch (e) {
+      console.warn('Could not fetch divisions from edge API:', e);
+    }
+  }
+
+  function renderDivisionsGrid(divisions) {
+    var grid = document.getElementById('divisions-cards-grid');
+    if (!grid) return;
+    if (!divisions || divisions.length === 0) return;
+    var html = '';
+    divisions.forEach(function (div) {
+      var specs = [];
+      try {
+        specs = typeof div.specs === 'string' ? JSON.parse(div.specs) : (div.specs || []);
+      } catch (e) {
+        specs = (div.specs || '').split(',').map(function (s) { return s.trim(); }).filter(Boolean);
+      }
+      var specsHtml = specs.map(function (sp) {
+        return '<span class="spec-pill">' + escapeHTML(sp) + '</span>';
+      }).join(' ');
+
+      html += '<article class="series-card">' +
+        '<div class="series-track-banner">' +
+          '<img src="' + escapeHTML(div.track_img || 'assets/img/circuit-b.svg') + '" alt="Track map" width="320" height="180">' +
+        '</div>' +
+        '<div class="series-card-body">' +
+          '<span class="series-badge">' + escapeHTML(div.category || 'Championship Series') + '</span>' +
+          '<h3>' + escapeHTML(div.name) + '</h3>' +
+          (div.tagline ? '<p style="color: var(--hm-purple-bright); font-size: 0.88rem; font-weight: 600; margin: -0.25rem 0 0.5rem;">' + escapeHTML(div.tagline) + '</p>' : '') +
+          '<p style="color: var(--text-muted); font-size: 0.95rem;">' + escapeHTML(div.description) + '</p>' +
+          '<div class="series-specs" style="margin-top: 1rem;">' +
+            '<span class="sim-badge">' + escapeHTML(div.sim || 'iRacing') + '</span>' +
+            specsHtml +
+          '</div>' +
+        '</div>' +
+      '</article>';
+    });
+    grid.innerHTML = html;
+  }
+
+  // --- Admin Race Control Operations ---
+
+  function getAdminAuthHeader() {
+    return (currentDriver && currentDriver.id) || 'nanenj@gmail.com';
+  }
+
+  async function loadAdminEvents() {
+    var tbody = document.getElementById('admin-events-tbody');
+    if (!tbody) return;
+    try {
+      var res = await fetch('/api/events?sim=all');
+      var data = await res.json();
+      if (!data.success || !Array.isArray(data.events)) return;
+      var events = data.events;
+      if (events.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="7" style="text-align:center; padding: 2rem; color: var(--text-muted);">No events found. Click "+ Create New Event" above to schedule one.</td></tr>';
+        return;
+      }
+      var html = '';
+      events.forEach(function (ev) {
+        html += '<tr data-event-id="' + escapeHTML(ev.id) + '">' +
+          '<td><strong>' + escapeHTML(ev.title) + '</strong></td>' +
+          '<td>' + escapeHTML(ev.series || '') + '</td>' +
+          '<td>' + escapeHTML(ev.track) + '</td>' +
+          '<td><span class="sim-badge">' + escapeHTML(ev.sim || 'iRacing') + '</span></td>' +
+          '<td>' + escapeHTML(formatEventDate(ev.event_date)) + ' &bull; ' + escapeHTML(ev.session_time || '') + '</td>' +
+          '<td><span class="spec-pill">' + escapeHTML(ev.status || 'Scheduled') + '</span></td>' +
+          '<td>' +
+            '<button type="button" class="admin-action-btn-sm btn-edit-event" data-event=\'' + escapeHTML(JSON.stringify(ev)) + '\'>Edit</button> ' +
+            '<button type="button" class="admin-action-btn-sm danger btn-delete-event" data-id="' + escapeHTML(ev.id) + '">Delete</button>' +
+          '</td>' +
+        '</tr>';
+      });
+      tbody.innerHTML = html;
+    } catch (e) {
+      console.warn('Error loading admin events:', e);
+    }
+  }
+
+  async function loadAdminRoster() {
+    var tbody = document.getElementById('admin-roster-tbody');
+    if (!tbody) return;
+    try {
+      var res = await fetch('/api/roster');
+      var data = await res.json();
+      if (!data.success || !Array.isArray(data.drivers)) return;
+      var drivers = data.drivers;
+      var html = '';
+      drivers.forEach(function (d) {
+        var isAdminPill = (d.isAdmin || d.is_admin === 1) ? '<span class="admin-badge" style="font-size: 0.68rem; padding: 0.15rem 0.4rem;">ADMIN</span>' : '<span style="color:var(--text-subtle);">Driver</span>';
+        html += '<tr data-driver-id="' + escapeHTML(d.id) + '">' +
+          '<td><strong>' + escapeHTML(d.alias) + '</strong>' + (d.pronouns ? ' <small style="color:var(--text-muted);">(' + escapeHTML(d.pronouns) + ')</small>' : '') + '</td>' +
+          '<td><span class="driver-num-plate">#' + escapeHTML(d.carNumber || '00') + '</span></td>' +
+          '<td style="font-family:var(--font-mono); font-size:0.85rem;">' + escapeHTML(d.email || '') + '</td>' +
+          '<td><span class="div-pill">' + escapeHTML(d.division || 'Spec Racing') + '</span></td>' +
+          '<td><span class="sim-badge">' + escapeHTML(d.sim || 'iRacing') + '</span></td>' +
+          '<td>' + isAdminPill + '</td>' +
+          '<td>' +
+            '<button type="button" class="admin-action-btn-sm btn-edit-driver" data-driver=\'' + escapeHTML(JSON.stringify(d)) + '\'>Edit</button> ' +
+            '<button type="button" class="admin-action-btn-sm danger btn-delete-driver" data-id="' + escapeHTML(d.id) + '" data-alias="' + escapeHTML(d.alias) + '">Remove</button>' +
+          '</td>' +
+        '</tr>';
+      });
+      tbody.innerHTML = html;
+    } catch (e) {
+      console.warn('Error loading admin roster:', e);
+    }
+  }
+
+  async function loadAdminDivisions() {
+    var tbody = document.getElementById('admin-divisions-tbody');
+    if (!tbody) return;
+    try {
+      var res = await fetch('/api/divisions');
+      var data = await res.json();
+      if (!data.success || !Array.isArray(data.divisions)) return;
+      var divisions = data.divisions;
+      var html = '';
+      divisions.forEach(function (div) {
+        var specs = '';
+        try {
+          var arr = typeof div.specs === 'string' ? JSON.parse(div.specs) : (div.specs || []);
+          specs = arr.join(', ');
+        } catch (e) {
+          specs = div.specs || '';
+        }
+        html += '<tr data-division-id="' + escapeHTML(div.id) + '">' +
+          '<td><strong>' + escapeHTML(div.name) + '</strong></td>' +
+          '<td><span class="series-badge">' + escapeHTML(div.category || 'Series') + '</span></td>' +
+          '<td><span class="sim-badge">' + escapeHTML(div.sim || 'iRacing') + '</span></td>' +
+          '<td style="font-size:0.88rem; color:var(--text-chrome);">' + escapeHTML(div.tagline || specs) + '</td>' +
+          '<td>' +
+            '<button type="button" class="admin-action-btn-sm btn-edit-division" data-division=\'' + escapeHTML(JSON.stringify(div)) + '\'>Edit</button> ' +
+            '<button type="button" class="admin-action-btn-sm danger btn-delete-division" data-id="' + escapeHTML(div.id) + '" data-name="' + escapeHTML(div.name) + '">Delete</button>' +
+          '</td>' +
+        '</tr>';
+      });
+      tbody.innerHTML = html;
+    } catch (e) {
+      console.warn('Error loading admin divisions:', e);
+    }
+  }
+
+  async function shiftScheduleWeeks(weeks) {
+    var feedbackEl = document.getElementById('admin-shift-feedback');
+    if (feedbackEl) {
+      feedbackEl.style.display = 'block';
+      feedbackEl.style.background = 'rgba(143, 96, 214, 0.15)';
+      feedbackEl.style.color = 'var(--hm-purple-bright)';
+      feedbackEl.textContent = 'Shifting schedule by ' + weeks + ' week(s)...';
+    }
+
+    try {
+      var res = await fetch('/api/admin/events/shift', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-Admin-Id': getAdminAuthHeader()
+        },
+        body: JSON.stringify({
+          weeks: weeks,
+          adminId: getAdminAuthHeader()
+        })
+      });
+      var result = await res.json();
+      if (!result.success) throw new Error(result.message || 'Failed to shift schedule.');
+
+      if (feedbackEl) {
+        feedbackEl.style.background = 'rgba(46, 204, 113, 0.15)';
+        feedbackEl.style.color = 'var(--telemetry-green)';
+        feedbackEl.textContent = 'Success: Race schedule successfully shifted by ' + weeks + ' week(s)!';
+        setTimeout(function () {
+          feedbackEl.style.display = 'none';
+        }, 5000);
+      }
+
+      // Refresh views
+      loadAdminEvents();
+      fetchEvents();
+    } catch (err) {
+      if (feedbackEl) {
+        feedbackEl.style.background = 'rgba(231, 76, 60, 0.15)';
+        feedbackEl.style.color = '#ff6b6b';
+        feedbackEl.textContent = 'Shift error: ' + (err.message || 'Could not shift schedule.');
+      }
+    }
+  }
+
+  function initAdminPortal() {
+    if (!isCurrentDriverAdmin()) {
+      updateUI();
+      return;
+    }
+    loadAdminEvents();
+    loadAdminRoster();
+    loadAdminDivisions();
   }
 
   // --- UI Update & Rendering ---
@@ -337,6 +645,28 @@ window.HER_CONFIG = window.HER_CONFIG || {
     var passCard = document.getElementById('paddock-pass-card');
     var formView = document.getElementById('portal-forms-view');
     var dashboardView = document.getElementById('portal-dashboard-view');
+    var navAdmin = document.getElementById('nav-item-admin');
+    var dashAdminBtn = document.getElementById('dash-admin-btn');
+    var adminUnauth = document.getElementById('admin-unauthorized-banner');
+    var adminAuth = document.getElementById('admin-authorized-panel');
+    var adminUserDisplay = document.getElementById('admin-user-display');
+    var isAdmin = isCurrentDriverAdmin();
+
+    // Admin Controls visibility
+    if (navAdmin) navAdmin.style.display = isAdmin ? 'list-item' : 'none';
+    if (dashAdminBtn) dashAdminBtn.style.display = isAdmin ? 'inline-flex' : 'none';
+    if (adminUserDisplay) {
+      adminUserDisplay.textContent = currentDriver ? currentDriver.email : 'nanenj@gmail.com';
+    }
+    if (adminUnauth && adminAuth) {
+      if (isAdmin) {
+        adminUnauth.style.display = 'none';
+        adminAuth.style.display = 'block';
+      } else {
+        adminUnauth.style.display = 'block';
+        adminAuth.style.display = 'none';
+      }
+    }
 
     // Header nav button
     if (navAuthBtn) {
@@ -375,8 +705,6 @@ window.HER_CONFIG = window.HER_CONFIG || {
     if (passCard) {
       renderPaddockPass(passCard, currentDriver || getLivePreviewData());
     }
-
-    renderRoster();
   }
 
   function getLivePreviewData() {
@@ -385,7 +713,6 @@ window.HER_CONFIG = window.HER_CONFIG || {
     var sim = document.getElementById('signup-sim');
     var div = document.getElementById('signup-division');
     var pron = document.getElementById('signup-pronouns');
-    var telem = document.getElementById('signup-telemetry');
 
     return {
       alias: (alias && alias.value.trim()) || 'YOUR DRIVER NAME',
@@ -394,7 +721,7 @@ window.HER_CONFIG = window.HER_CONFIG || {
       division: (div && div.value) || 'Spec Racing',
       pronouns: (pron && pron.value.trim()) || 'she/her',
       discord: 'Community Paddock',
-      telemetryId: (telem && telem.value.trim()) || 'READY FOR TELEMETRY',
+      telemetryId: 'SIM-READY',
       status: 'Ready to Register',
       joinedDate: '2026 Season'
     };
@@ -433,8 +760,8 @@ window.HER_CONFIG = window.HER_CONFIG || {
               <span class="pass-value ok">${escapeHTML(data.status || 'Active')}</span>
             </div>
             <div class="pass-cell">
-              <span class="pass-label">Telemetry ID</span>
-              <span class="pass-value mono">${escapeHTML(data.telemetryId || 'TELEMETRY READY')}</span>
+              <span class="pass-label">Accreditation</span>
+              <span class="pass-value mono">${escapeHTML(data.carNumber ? 'HM-2026-#' + data.carNumber : 'HM-2026-GRID')}</span>
             </div>
           </div>
         </div>
@@ -456,7 +783,6 @@ window.HER_CONFIG = window.HER_CONFIG || {
     var simEl = document.getElementById('dash-sim');
     var discEl = document.getElementById('dash-discord');
     var twitchEl = document.getElementById('dash-twitch');
-    var telemEl = document.getElementById('dash-telemetry');
 
     if (nameEl) nameEl.textContent = driver.alias;
     if (numEl) numEl.textContent = '#' + driver.carNumber;
@@ -464,31 +790,6 @@ window.HER_CONFIG = window.HER_CONFIG || {
     if (simEl) simEl.textContent = driver.sim;
     if (discEl) discEl.textContent = driver.discord || 'Not linked';
     if (twitchEl) twitchEl.textContent = driver.twitch || 'None';
-    if (telemEl) telemEl.textContent = driver.telemetryId || 'Synced';
-  }
-
-  function renderRoster() {
-    var tbody = document.getElementById('roster-tbody');
-    if (!tbody) return;
-
-    var db = {};
-    try {
-      db = JSON.parse(safeGet(DB_KEY) || '{}');
-    } catch (e) {}
-
-    var drivers = Object.values(db);
-    if (drivers.length === 0) {
-      tbody.innerHTML = '<tr><td colspan="4" style="text-align: center; color: var(--text-muted);">No drivers registered yet. Sign up to join the grid!</td></tr>';
-      return;
-    }
-
-    var html = '';
-    drivers.forEach(function (d) {
-      var twitchHtml = d.twitch ? '<a href="https://twitch.tv/' + escapeHTML(d.twitch.replace('@', '')) + '" target="_blank">' + escapeHTML(d.twitch) + '</a>' : '<span class="tbd">-</span>';
-      var nameHtml = escapeHTML(d.alias) + ' <span style="color: var(--brand); font-size: 0.85em; margin-left: 0.3rem;">#' + escapeHTML(d.carNumber || '00') + '</span>';
-      html += '<tr><td>' + nameHtml + '</td><td>' + escapeHTML(d.pronouns || '-') + '</td><td>' + escapeHTML(d.sim || 'iRacing') + '</td><td>' + twitchHtml + '</td></tr>';
-    });
-    tbody.innerHTML = html;
   }
 
   function escapeHTML(str) {
@@ -500,13 +801,14 @@ window.HER_CONFIG = window.HER_CONFIG || {
       .replace(/"/g, '&quot;');
   }
 
-  // --- Attach All Event Listeners ---
+  // --- Attach Event Listeners ---
 
   function initMembers() {
     updateUI();
+    fetchRoster();
 
     // Live typing on signup inputs -> live updates Paddock Pass
-    var inputIds = ['signup-alias', 'signup-number', 'signup-sim', 'signup-division', 'signup-pronouns', 'signup-telemetry'];
+    var inputIds = ['signup-alias', 'signup-number', 'signup-sim', 'signup-division', 'signup-pronouns'];
     inputIds.forEach(function (id) {
       var el = document.getElementById(id);
       if (el) {
@@ -521,7 +823,7 @@ window.HER_CONFIG = window.HER_CONFIG || {
       }
     });
 
-    // Password Reveal logic (Event Delegation)
+    // Password Reveal logic
     document.addEventListener('click', function(e) {
       var btn = e.target.closest('.btn-reveal');
       if (!btn) return;
@@ -555,7 +857,6 @@ window.HER_CONFIG = window.HER_CONFIG || {
         if (accountView) accountView.style.display = 'none';
         if (profileView) {
           profileView.style.display = 'block';
-          // Prefill
           if (currentDriver) {
             document.getElementById('edit-alias').value = currentDriver.alias || '';
             document.getElementById('edit-pronouns').value = currentDriver.pronouns || '';
@@ -564,7 +865,6 @@ window.HER_CONFIG = window.HER_CONFIG || {
             document.getElementById('edit-division').value = currentDriver.division || 'Spec Racing';
             document.getElementById('edit-discord').value = currentDriver.discord || '';
             document.getElementById('edit-twitch').value = currentDriver.twitch || '';
-            document.getElementById('edit-telemetry').value = currentDriver.telemetryId || '';
           }
         }
       });
@@ -609,9 +909,8 @@ window.HER_CONFIG = window.HER_CONFIG || {
       });
     }
 
-    // Direct submit button click & form submit handlers
+    // Signup submission
     var btnSignup = document.getElementById('btn-submit-signup');
-
     async function handleSignup(e) {
       if (e) e.preventDefault();
       var errBox = document.getElementById('signup-error');
@@ -627,7 +926,6 @@ window.HER_CONFIG = window.HER_CONFIG || {
       var pronInput = document.getElementById('signup-pronouns');
       var discInput = document.getElementById('signup-discord');
       var twitchInput = document.getElementById('signup-twitch');
-      var telemInput = document.getElementById('signup-telemetry');
 
       var alias = aliasInput ? aliasInput.value.trim() : '';
       if (!alias) {
@@ -646,7 +944,7 @@ window.HER_CONFIG = window.HER_CONFIG || {
       }
 
       try {
-        await registerDriver({
+        var profile = await registerDriver({
           alias: alias,
           email: email || (alias.toLowerCase().replace(/[^a-z0-9]/g, '') + '@paddock.sim'),
           password: password || 'pass123',
@@ -655,33 +953,32 @@ window.HER_CONFIG = window.HER_CONFIG || {
           division: divInput ? divInput.value : 'Spec Racing',
           pronouns: pronInput ? pronInput.value : 'she/her',
           discord: discInput ? discInput.value.trim() : '',
-          twitch: twitchInput ? twitchInput.value.trim() : '',
-          telemetryId: telemInput ? telemInput.value.trim() : ''
+          twitch: twitchInput ? twitchInput.value.trim() : ''
         });
-        
+
         var successBox = document.getElementById('signup-success');
         if (successBox) {
-          successBox.textContent = 'Registration successful! Please check your email to confirm your account.';
+          successBox.textContent = 'Registration successful! Driver Pass added to the Grid.';
           successBox.style.display = 'block';
         }
         var formSignupEl = document.getElementById('form-signup');
         if (formSignupEl) formSignupEl.reset();
-        
+
+        // Switch to login tab
+        if (tabLogin) tabLogin.click();
+        if (document.getElementById('login-email')) {
+          document.getElementById('login-email').value = profile.email;
+        }
       } catch (err) {
         if (errBox) errBox.textContent = err.message || 'Error registering driver.';
       }
     }
 
-    if (btnSignup) {
-      btnSignup.addEventListener('click', handleSignup);
-    }
-    if (formSignup) {
-      formSignup.addEventListener('submit', handleSignup);
-    }
+    if (btnSignup) btnSignup.addEventListener('click', handleSignup);
+    if (formSignup) formSignup.addEventListener('submit', handleSignup);
 
-    // Login submit handler
+    // Login submission
     var btnLogin = document.getElementById('btn-submit-login');
-
     async function handleLogin(e) {
       if (e) e.preventDefault();
       var errBox = document.getElementById('login-error');
@@ -704,14 +1001,10 @@ window.HER_CONFIG = window.HER_CONFIG || {
       }
     }
 
-    if (btnLogin) {
-      btnLogin.addEventListener('click', handleLogin);
-    }
-    if (formLogin) {
-      formLogin.addEventListener('submit', handleLogin);
-    }
+    if (btnLogin) btnLogin.addEventListener('click', handleLogin);
+    if (formLogin) formLogin.addEventListener('submit', handleLogin);
 
-    // Discord Fast-Connect button
+    // Discord button
     var discordBtn = document.getElementById('btn-discord-login');
     if (discordBtn) {
       discordBtn.addEventListener('click', function (e) {
@@ -729,12 +1022,12 @@ window.HER_CONFIG = window.HER_CONFIG || {
       });
     }
 
-    // Password Reset UI Handlers
+    // Password Reset handlers
     var forgotLink = document.getElementById('link-forgot-password');
     var backLoginLink = document.getElementById('link-back-login');
     var formForgot = document.getElementById('form-forgot-password');
     var formReset = document.getElementById('form-reset-password');
-    
+
     if (forgotLink && formLogin && formForgot) {
       forgotLink.addEventListener('click', function(e) {
         e.preventDefault();
@@ -742,7 +1035,7 @@ window.HER_CONFIG = window.HER_CONFIG || {
         formForgot.style.display = 'grid';
       });
     }
-    
+
     if (backLoginLink && formLogin && formForgot) {
       backLoginLink.addEventListener('click', function(e) {
         e.preventDefault();
@@ -756,92 +1049,31 @@ window.HER_CONFIG = window.HER_CONFIG || {
       if (e) e.preventDefault();
       var errBox = document.getElementById('forgot-error');
       if (errBox) errBox.textContent = '';
-      
+
       var emailInput = document.getElementById('forgot-email');
       var email = emailInput ? emailInput.value.trim() : '';
       if (!email) {
         if (errBox) errBox.textContent = 'Please enter your email.';
         return;
       }
-      
+
       try {
         await sendPasswordReset(email);
         var successBox = document.getElementById('signup-success');
         if (successBox) {
-          successBox.textContent = 'Password reset link sent! Check your email.';
+          successBox.textContent = 'Password reset request received!';
           successBox.style.display = 'block';
         }
         if (formForgot) formForgot.reset();
         formForgot.style.display = 'none';
         formLogin.style.display = 'grid';
       } catch (err) {
-        if (errBox) errBox.textContent = err.message || 'Error sending reset link.';
+        if (errBox) errBox.textContent = err.message || 'Error sending reset request.';
       }
     }
-    
+
     if (btnForgot) btnForgot.addEventListener('click', handleForgot);
     if (formForgot) formForgot.addEventListener('submit', handleForgot);
-
-    var btnReset = document.getElementById('btn-submit-reset');
-    async function handleReset(e) {
-      if (e) e.preventDefault();
-      var errBox = document.getElementById('reset-error');
-      if (errBox) errBox.textContent = '';
-      
-      var passInput = document.getElementById('reset-password');
-      var confInput = document.getElementById('reset-confirm');
-      var password = passInput ? passInput.value : '';
-      var confirm = confInput ? confInput.value : '';
-      
-      if (!password) {
-        if (errBox) errBox.textContent = 'Please enter a new password.';
-        return;
-      }
-      if (password !== confirm) {
-        if (errBox) errBox.textContent = 'Passwords do not match.';
-        return;
-      }
-      
-      try {
-        await updatePassword(password);
-        var successBox = document.getElementById('signup-success');
-        if (successBox) {
-          successBox.textContent = 'Password updated successfully! You can now log in.';
-          successBox.style.display = 'block';
-        }
-        if (formReset) {
-          formReset.reset();
-          formReset.style.display = 'none';
-        }
-        if (formLogin) formLogin.style.display = 'grid';
-        
-        // clean up hash
-        if (window.history.replaceState) {
-          window.history.replaceState(null, null, window.location.pathname);
-        }
-      } catch (err) {
-        if (errBox) errBox.textContent = err.message || 'Error updating password.';
-      }
-    }
-    
-    if (btnReset) btnReset.addEventListener('click', handleReset);
-    if (formReset) formReset.addEventListener('submit', handleReset);
-
-    // Check URL for reset mode
-    var hash = window.location.hash;
-    if (hash.includes('type=recovery') || hash.includes('#reset-password')) {
-      if (tabSignup) tabSignup.classList.remove('active');
-      if (tabLogin) tabLogin.classList.remove('active');
-      if (formSignup) formSignup.style.display = 'none';
-      if (formLogin) formLogin.style.display = 'none';
-      if (formReset) formReset.style.display = 'grid';
-      
-      // Auto-scroll to portal
-      setTimeout(function() {
-        var portal = document.getElementById('members');
-        if (portal) portal.scrollIntoView({ behavior: 'smooth' });
-      }, 100);
-    }
 
     // Profile Settings Form
     var formProfile = document.getElementById('form-edit-profile');
@@ -860,8 +1092,7 @@ window.HER_CONFIG = window.HER_CONFIG || {
           sim: document.getElementById('edit-sim').value,
           division: document.getElementById('edit-division').value,
           discord: document.getElementById('edit-discord').value.trim(),
-          twitch: document.getElementById('edit-twitch').value.trim(),
-          telemetryId: document.getElementById('edit-telemetry').value.trim()
+          twitch: document.getElementById('edit-twitch').value.trim()
         };
 
         if (!data.alias) {
@@ -872,7 +1103,7 @@ window.HER_CONFIG = window.HER_CONFIG || {
         try {
           await updateProfile(data);
           if (successBox) {
-            successBox.textContent = 'Profile updated successfully!';
+            successBox.textContent = 'Profile updated on edge!';
             successBox.style.display = 'block';
           }
         } catch (err) {
@@ -907,13 +1138,9 @@ window.HER_CONFIG = window.HER_CONFIG || {
             current_password: currentPassword,
             new_password: newPassword
           });
-          
+
           if (successBox) {
-            var msg = 'Account updated successfully!';
-            if (email && email !== currentDriver.email) {
-              msg += ' Please check your new email to confirm the change.';
-            }
-            successBox.textContent = msg;
+            successBox.textContent = 'Account security settings updated successfully!';
             successBox.style.display = 'block';
           }
           formAccount.reset();
@@ -923,7 +1150,7 @@ window.HER_CONFIG = window.HER_CONFIG || {
       });
     }
 
-    // Nav auth button -> scroll to members section
+    // Nav auth button -> scroll to members
     var navAuthBtn = document.getElementById('nav-auth-btn');
     if (navAuthBtn) {
       navAuthBtn.addEventListener('click', function (e) {
@@ -932,22 +1159,467 @@ window.HER_CONFIG = window.HER_CONFIG || {
         if (portal) portal.scrollIntoView({ behavior: 'smooth' });
       });
     }
+
+    // --- Game Filter Scope Listeners ---
+    function wireGameFilters(containerId) {
+      var container = document.getElementById(containerId);
+      if (!container) return;
+      container.addEventListener('click', function (e) {
+        var btn = e.target.closest('.game-filter-btn');
+        if (!btn) return;
+        var sim = btn.getAttribute('data-sim') || 'all';
+        document.querySelectorAll('#schedule-game-filters .game-filter-btn, #calendar-game-filters .game-filter-btn').forEach(function (b) {
+          if (b.getAttribute('data-sim') === sim) {
+            b.classList.add('active');
+          } else {
+            b.classList.remove('active');
+          }
+        });
+        fetchEvents(sim);
+      });
+    }
+
+    wireGameFilters('schedule-game-filters');
+    wireGameFilters('calendar-game-filters');
+
+    // Initial fetch of events & divisions
+    fetchEvents('all');
+    fetchDivisions();
+
+    // --- Admin Portal Controls & Listeners ---
+
+    // Tabs
+    var tabEventsBtn = document.getElementById('tab-admin-events-btn');
+    var tabRosterBtn = document.getElementById('tab-admin-roster-btn');
+    var tabDivisionsBtn = document.getElementById('tab-admin-divisions-btn');
+    var panelEvents = document.getElementById('panel-admin-events');
+    var panelRoster = document.getElementById('panel-admin-roster');
+    var panelDivisions = document.getElementById('panel-admin-divisions');
+
+    function switchAdminTab(activeBtn, activePanel) {
+      [tabEventsBtn, tabRosterBtn, tabDivisionsBtn].forEach(function(b) {
+        if (b) {
+          b.classList.remove('active');
+          b.setAttribute('aria-selected', 'false');
+        }
+      });
+      [panelEvents, panelRoster, panelDivisions].forEach(function(p) {
+        if (p) p.style.display = 'none';
+      });
+      if (activeBtn) {
+        activeBtn.classList.add('active');
+        activeBtn.setAttribute('aria-selected', 'true');
+      }
+      if (activePanel) activePanel.style.display = 'block';
+    }
+
+    if (tabEventsBtn) {
+      tabEventsBtn.addEventListener('click', function() {
+        switchAdminTab(tabEventsBtn, panelEvents);
+        loadAdminEvents();
+      });
+    }
+    if (tabRosterBtn) {
+      tabRosterBtn.addEventListener('click', function() {
+        switchAdminTab(tabRosterBtn, panelRoster);
+        loadAdminRoster();
+      });
+    }
+    if (tabDivisionsBtn) {
+      tabDivisionsBtn.addEventListener('click', function() {
+        switchAdminTab(tabDivisionsBtn, panelDivisions);
+        loadAdminDivisions();
+      });
+    }
+
+    // Schedule Shifting
+    var btnShiftMinus = document.getElementById('btn-shift-minus-1');
+    var btnShiftPlus = document.getElementById('btn-shift-plus-1');
+    var btnShiftCustom = document.getElementById('btn-shift-custom');
+
+    if (btnShiftMinus) {
+      btnShiftMinus.addEventListener('click', function() {
+        shiftScheduleWeeks(-1);
+      });
+    }
+    if (btnShiftPlus) {
+      btnShiftPlus.addEventListener('click', function() {
+        shiftScheduleWeeks(1);
+      });
+    }
+    if (btnShiftCustom) {
+      btnShiftCustom.addEventListener('click', function() {
+        var wInput = document.getElementById('admin-shift-weeks');
+        var w = parseInt(wInput ? wInput.value : '1', 10);
+        if (isNaN(w) || w === 0) w = 1;
+        shiftScheduleWeeks(w);
+      });
+    }
+
+    // Admin Events Form & Table
+    var btnToggleEventForm = document.getElementById('btn-toggle-event-form');
+    var btnCancelEventForm = document.getElementById('btn-cancel-event-form');
+    var eventFormPanel = document.getElementById('admin-event-form-panel');
+    var formAdminEvent = document.getElementById('form-admin-event');
+
+    if (btnToggleEventForm && eventFormPanel && formAdminEvent) {
+      btnToggleEventForm.addEventListener('click', function() {
+        formAdminEvent.reset();
+        document.getElementById('admin-event-id').value = '';
+        document.getElementById('admin-event-form-title').textContent = 'Add Scheduled Event';
+        eventFormPanel.style.display = eventFormPanel.style.display === 'block' ? 'none' : 'block';
+      });
+    }
+
+    if (btnCancelEventForm && eventFormPanel) {
+      btnCancelEventForm.addEventListener('click', function() {
+        eventFormPanel.style.display = 'none';
+      });
+    }
+
+    if (formAdminEvent) {
+      formAdminEvent.addEventListener('submit', async function(e) {
+        e.preventDefault();
+        var id = document.getElementById('admin-event-id').value;
+        var errEl = document.getElementById('admin-event-error');
+        if (errEl) errEl.textContent = '';
+
+        var payload = {
+          title: document.getElementById('admin-event-title').value.trim(),
+          series: document.getElementById('admin-event-series').value,
+          track: document.getElementById('admin-event-track').value.trim(),
+          sim: document.getElementById('admin-event-sim').value,
+          event_date: document.getElementById('admin-event-date').value,
+          session_time: document.getElementById('admin-event-time').value.trim(),
+          status: document.getElementById('admin-event-status').value,
+          notes: document.getElementById('admin-event-notes').value.trim(),
+          adminId: getAdminAuthHeader()
+        };
+
+        if (!payload.title || !payload.track || !payload.event_date) {
+          if (errEl) errEl.textContent = 'Please fill out all required fields.';
+          return;
+        }
+
+        try {
+          var url = id ? '/api/admin/events/' + encodeURIComponent(id) : '/api/admin/events';
+          var method = id ? 'PUT' : 'POST';
+          var res = await fetch(url, {
+            method: method,
+            headers: {
+              'Content-Type': 'application/json',
+              'X-Admin-Id': getAdminAuthHeader()
+            },
+            body: JSON.stringify(payload)
+          });
+          var result = await res.json();
+          if (!result.success) throw new Error(result.message || 'Error saving event.');
+
+          formAdminEvent.reset();
+          if (eventFormPanel) eventFormPanel.style.display = 'none';
+          loadAdminEvents();
+          fetchEvents();
+        } catch (err) {
+          if (errEl) errEl.textContent = err.message;
+        }
+      });
+    }
+
+    var adminEventsTbody = document.getElementById('admin-events-tbody');
+    if (adminEventsTbody) {
+      adminEventsTbody.addEventListener('click', async function(e) {
+        var editBtn = e.target.closest('.btn-edit-event');
+        var deleteBtn = e.target.closest('.btn-delete-event');
+
+        if (editBtn) {
+          var evData = JSON.parse(editBtn.getAttribute('data-event') || '{}');
+          if (evData && eventFormPanel) {
+            document.getElementById('admin-event-id').value = evData.id || '';
+            document.getElementById('admin-event-title').value = evData.title || '';
+            document.getElementById('admin-event-series').value = evData.series || 'Spec Racing Division';
+            document.getElementById('admin-event-track').value = evData.track || '';
+            document.getElementById('admin-event-sim').value = evData.sim || 'iRacing';
+            document.getElementById('admin-event-date').value = evData.event_date || '';
+            document.getElementById('admin-event-time').value = evData.session_time || '';
+            document.getElementById('admin-event-status').value = evData.status || 'Scheduled';
+            document.getElementById('admin-event-notes').value = evData.notes || '';
+            document.getElementById('admin-event-form-title').textContent = 'Edit Scheduled Event';
+            eventFormPanel.style.display = 'block';
+            eventFormPanel.scrollIntoView({ behavior: 'smooth' });
+          }
+        }
+
+        if (deleteBtn) {
+          var id = deleteBtn.getAttribute('data-id');
+          if (!id) return;
+          if (!confirm('Are you sure you want to delete this scheduled race event?')) return;
+
+          try {
+            var res = await fetch('/api/admin/events/' + encodeURIComponent(id), {
+              method: 'DELETE',
+              headers: {
+                'Content-Type': 'application/json',
+                'X-Admin-Id': getAdminAuthHeader()
+              },
+              body: JSON.stringify({ adminId: getAdminAuthHeader() })
+            });
+            var result = await res.json();
+            if (!result.success) throw new Error(result.message || 'Error deleting event.');
+            loadAdminEvents();
+            fetchEvents();
+          } catch (err) {
+            alert('Delete failed: ' + err.message);
+          }
+        }
+      });
+    }
+
+    // Admin Driver Roster Form & Table
+    var driverFormPanel = document.getElementById('admin-driver-form-panel');
+    var formAdminDriver = document.getElementById('form-admin-driver');
+    var btnCancelDriverForm = document.getElementById('btn-cancel-driver-form');
+
+    if (btnCancelDriverForm && driverFormPanel) {
+      btnCancelDriverForm.addEventListener('click', function() {
+        driverFormPanel.style.display = 'none';
+      });
+    }
+
+    if (formAdminDriver) {
+      formAdminDriver.addEventListener('submit', async function(e) {
+        e.preventDefault();
+        var id = document.getElementById('admin-driver-id').value;
+        var errEl = document.getElementById('admin-driver-error');
+        if (errEl) errEl.textContent = '';
+
+        var payload = {
+          alias: document.getElementById('admin-driver-alias').value.trim(),
+          carNumber: document.getElementById('admin-driver-number').value.trim(),
+          sim: document.getElementById('admin-driver-sim').value,
+          division: document.getElementById('admin-driver-division').value,
+          status: document.getElementById('admin-driver-status').value,
+          is_admin: document.getElementById('admin-driver-is-admin').checked ? 1 : 0,
+          adminId: getAdminAuthHeader()
+        };
+
+        if (!payload.alias) {
+          if (errEl) errEl.textContent = 'Driver alias is required.';
+          return;
+        }
+
+        try {
+          var res = await fetch('/api/admin/drivers/' + encodeURIComponent(id), {
+            method: 'PUT',
+            headers: {
+              'Content-Type': 'application/json',
+              'X-Admin-Id': getAdminAuthHeader()
+            },
+            body: JSON.stringify(payload)
+          });
+          var result = await res.json();
+          if (!result.success) throw new Error(result.message || 'Error updating driver.');
+
+          if (driverFormPanel) driverFormPanel.style.display = 'none';
+          loadAdminRoster();
+          fetchRoster();
+        } catch (err) {
+          if (errEl) errEl.textContent = err.message;
+        }
+      });
+    }
+
+    var adminRosterTbody = document.getElementById('admin-roster-tbody');
+    if (adminRosterTbody) {
+      adminRosterTbody.addEventListener('click', async function(e) {
+        var editBtn = e.target.closest('.btn-edit-driver');
+        var deleteBtn = e.target.closest('.btn-delete-driver');
+
+        if (editBtn) {
+          var dData = JSON.parse(editBtn.getAttribute('data-driver') || '{}');
+          if (dData && driverFormPanel) {
+            document.getElementById('admin-driver-id').value = dData.id || '';
+            document.getElementById('admin-driver-alias').value = dData.alias || '';
+            document.getElementById('admin-driver-number').value = dData.carNumber || '';
+            document.getElementById('admin-driver-sim').value = dData.sim || 'iRacing';
+            document.getElementById('admin-driver-division').value = dData.division || 'Spec Racing';
+            document.getElementById('admin-driver-status').value = dData.status || 'Active Driver';
+            document.getElementById('admin-driver-is-admin').checked = Boolean(dData.isAdmin || dData.is_admin);
+            driverFormPanel.style.display = 'block';
+            driverFormPanel.scrollIntoView({ behavior: 'smooth' });
+          }
+        }
+
+        if (deleteBtn) {
+          var id = deleteBtn.getAttribute('data-id');
+          var alias = deleteBtn.getAttribute('data-alias') || 'driver';
+          if (!id) return;
+          if (!confirm('Are you sure you want to remove ' + alias + ' from the driver roster?')) return;
+
+          try {
+            var res = await fetch('/api/admin/drivers/' + encodeURIComponent(id), {
+              method: 'DELETE',
+              headers: {
+                'Content-Type': 'application/json',
+                'X-Admin-Id': getAdminAuthHeader()
+              },
+              body: JSON.stringify({ adminId: getAdminAuthHeader() })
+            });
+            var result = await res.json();
+            if (!result.success) throw new Error(result.message || 'Error deleting driver.');
+            loadAdminRoster();
+            fetchRoster();
+          } catch (err) {
+            alert('Delete failed: ' + err.message);
+          }
+        }
+      });
+    }
+
+    // Admin Divisions Form & Table
+    var btnToggleDivForm = document.getElementById('btn-toggle-division-form');
+    var btnCancelDivForm = document.getElementById('btn-cancel-division-form');
+    var divFormPanel = document.getElementById('admin-division-form-panel');
+    var formAdminDiv = document.getElementById('form-admin-division');
+
+    if (btnToggleDivForm && divFormPanel && formAdminDiv) {
+      btnToggleDivForm.addEventListener('click', function() {
+        formAdminDiv.reset();
+        document.getElementById('admin-division-id').value = '';
+        document.getElementById('admin-division-form-title').textContent = 'Add Championship Division';
+        divFormPanel.style.display = divFormPanel.style.display === 'block' ? 'none' : 'block';
+      });
+    }
+
+    if (btnCancelDivForm && divFormPanel) {
+      btnCancelDivForm.addEventListener('click', function() {
+        divFormPanel.style.display = 'none';
+      });
+    }
+
+    if (formAdminDiv) {
+      formAdminDiv.addEventListener('submit', async function(e) {
+        e.preventDefault();
+        var id = document.getElementById('admin-division-id').value;
+        var errEl = document.getElementById('admin-division-error');
+        if (errEl) errEl.textContent = '';
+
+        var specsRaw = document.getElementById('admin-div-specs').value.trim();
+        var specsArr = specsRaw ? specsRaw.split(',').map(function(s) { return s.trim(); }).filter(Boolean) : [];
+
+        var payload = {
+          name: document.getElementById('admin-div-name').value.trim(),
+          category: document.getElementById('admin-div-category').value.trim(),
+          tagline: document.getElementById('admin-div-tagline').value.trim(),
+          sim: document.getElementById('admin-div-sim').value,
+          description: document.getElementById('admin-div-desc').value.trim(),
+          specs: specsArr,
+          adminId: getAdminAuthHeader()
+        };
+
+        if (!payload.name || !payload.description) {
+          if (errEl) errEl.textContent = 'Division name and description are required.';
+          return;
+        }
+
+        try {
+          var url = id ? '/api/admin/divisions/' + encodeURIComponent(id) : '/api/admin/divisions';
+          var method = id ? 'PUT' : 'POST';
+          var res = await fetch(url, {
+            method: method,
+            headers: {
+              'Content-Type': 'application/json',
+              'X-Admin-Id': getAdminAuthHeader()
+            },
+            body: JSON.stringify(payload)
+          });
+          var result = await res.json();
+          if (!result.success) throw new Error(result.message || 'Error saving division.');
+
+          formAdminDiv.reset();
+          if (divFormPanel) divFormPanel.style.display = 'none';
+          loadAdminDivisions();
+          fetchDivisions();
+        } catch (err) {
+          if (errEl) errEl.textContent = err.message;
+        }
+      });
+    }
+
+    var adminDivisionsTbody = document.getElementById('admin-divisions-tbody');
+    if (adminDivisionsTbody) {
+      adminDivisionsTbody.addEventListener('click', async function(e) {
+        var editBtn = e.target.closest('.btn-edit-division');
+        var deleteBtn = e.target.closest('.btn-delete-division');
+
+        if (editBtn) {
+          var divData = JSON.parse(editBtn.getAttribute('data-division') || '{}');
+          if (divData && divFormPanel) {
+            document.getElementById('admin-division-id').value = divData.id || '';
+            document.getElementById('admin-div-name').value = divData.name || '';
+            document.getElementById('admin-div-category').value = divData.category || '';
+            document.getElementById('admin-div-tagline').value = divData.tagline || '';
+            document.getElementById('admin-div-sim').value = divData.sim || 'iRacing';
+            document.getElementById('admin-div-desc').value = divData.description || '';
+            
+            var specs = '';
+            try {
+              specs = typeof divData.specs === 'string' ? JSON.parse(divData.specs).join(', ') : (divData.specs || []).join(', ');
+            } catch (err) {
+              specs = divData.specs || '';
+            }
+            document.getElementById('admin-div-specs').value = specs;
+            document.getElementById('admin-division-form-title').textContent = 'Edit Championship Division';
+            divFormPanel.style.display = 'block';
+            divFormPanel.scrollIntoView({ behavior: 'smooth' });
+          }
+        }
+
+        if (deleteBtn) {
+          var id = deleteBtn.getAttribute('data-id');
+          var name = deleteBtn.getAttribute('data-name') || 'division';
+          if (!id) return;
+          if (!confirm('Are you sure you want to delete ' + name + '?')) return;
+
+          try {
+            var res = await fetch('/api/admin/divisions/' + encodeURIComponent(id), {
+              method: 'DELETE',
+              headers: {
+                'Content-Type': 'application/json',
+                'X-Admin-Id': getAdminAuthHeader()
+              },
+              body: JSON.stringify({ adminId: getAdminAuthHeader() })
+            });
+            var result = await res.json();
+            if (!result.success) throw new Error(result.message || 'Error deleting division.');
+            loadAdminDivisions();
+            fetchDivisions();
+          } catch (err) {
+            alert('Delete failed: ' + err.message);
+          }
+        }
+      });
+    }
   }
 
-  // Self-executing initialization: supports both premature and delayed script loading
   if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', initMembers);
   } else {
     initMembers();
   }
 
-  // Global API
   window.HerMembers = {
     getDriver: function () { return currentDriver; },
+    isAdmin: isCurrentDriverAdmin,
     register: registerDriver,
     login: loginDriver,
     loginWithDiscord: loginWithDiscord,
     logout: logoutDriver,
-    updateUI: updateUI
+    updateUI: updateUI,
+    fetchRoster: fetchRoster,
+    fetchEvents: fetchEvents,
+    fetchDivisions: fetchDivisions,
+    renderCalendar: function() { fetchEvents(currentSimFilter); },
+    renderDivisions: fetchDivisions,
+    initAdmin: initAdminPortal
   };
 })();

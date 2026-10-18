@@ -1,0 +1,12 @@
+{
+  "name": "hm-website",
+  "version": "1.0.0",
+  "description": "Her Motorsport Website",
+  "scripts": {
+    "dev": "npm --prefix cloudflare-worker run dev",
+    "deploy": "npm --prefix cloudflare-worker run deploy",
+    "build": "npm --prefix cloudflare-worker run build",
+    "db:init:local": "npm --prefix cloudflare-worker run db:init:local",
+    "db:init:remote": "npm --prefix cloudflare-worker run db:init:remote"
+  }
+}

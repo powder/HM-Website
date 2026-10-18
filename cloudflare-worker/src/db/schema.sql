@@ -1,0 +1,52 @@
+-- Her Motorsport D1 Database Schema
+
+CREATE TABLE IF NOT EXISTS drivers (
+    id TEXT PRIMARY KEY,
+    alias TEXT NOT NULL,
+    email TEXT UNIQUE NOT NULL,
+    password_hash TEXT NOT NULL,
+    car_number TEXT NOT NULL DEFAULT '42',
+    sim TEXT NOT NULL DEFAULT 'iRacing',
+    division TEXT NOT NULL DEFAULT 'Spec Racing',
+    pronouns TEXT DEFAULT 'she/her',
+    discord TEXT DEFAULT '',
+    twitch TEXT DEFAULT '',
+    telemetry_id TEXT,
+    status TEXT DEFAULT 'Active Driver',
+    is_admin INTEGER DEFAULT 0,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX IF NOT EXISTS idx_drivers_email ON drivers(email);
+CREATE INDEX IF NOT EXISTS idx_drivers_car_number ON drivers(car_number);
+
+CREATE TABLE IF NOT EXISTS events (
+    id TEXT PRIMARY KEY,
+    title TEXT NOT NULL,
+    series TEXT NOT NULL,
+    track TEXT NOT NULL,
+    sim TEXT NOT NULL DEFAULT 'iRacing',
+    event_date TEXT NOT NULL,
+    session_time TEXT NOT NULL,
+    status TEXT DEFAULT 'Scheduled',
+    notes TEXT DEFAULT '',
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX IF NOT EXISTS idx_events_date ON events(event_date);
+CREATE INDEX IF NOT EXISTS idx_events_sim ON events(sim);
+
+CREATE TABLE IF NOT EXISTS divisions (
+    id TEXT PRIMARY KEY,
+    name TEXT NOT NULL,
+    category TEXT NOT NULL,
+    tagline TEXT NOT NULL,
+    description TEXT NOT NULL,
+    sim TEXT NOT NULL DEFAULT 'iRacing',
+    specs TEXT NOT NULL DEFAULT '[]',
+    track_img TEXT DEFAULT 'assets/img/circuit-b.svg',
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+);
