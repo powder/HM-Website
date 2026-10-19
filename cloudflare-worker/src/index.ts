@@ -1,6 +1,7 @@
 import { Hono } from 'hono';
 import { cors } from 'hono/cors';
 import { secureHeaders } from 'hono/secure-headers';
+import { registerSyncRoutes } from './sync.ts';
 
 type Bindings = {
   DB: D1Database;
@@ -543,6 +544,9 @@ app.delete('/api/admin/drivers/:id', async (c) => {
     return c.json({ success: false, message: err.message }, 500);
   }
 });
+
+// --- HMS Data Sync rendezvous (presence only; stores no files) ---
+registerSyncRoutes(app);
 
 // --- Edge Clean URL Redirects ---
 app.get('/conduct', (c) => c.redirect('/#conduct', 301));

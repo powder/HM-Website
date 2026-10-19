@@ -114,3 +114,18 @@ Wrangler will upload your static assets to Cloudflare's edge CDN and deploy the 
 | `POST` | `/api/auth/forgot-password` | Handles password reset requests |
 | `GET` | `/conduct` | Edge 301 redirect to `/#conduct` |
 | `GET` | `/*` | Edge CDN serving of files in `public/` |
+
+---
+
+## HMS Data Sync rendezvous (`/api/sync/v1`)
+
+The HMS Data Sync desktop app uses the Worker only to help members find each other while they are online. **No files, rosters, paints or recordings are ever stored here**; members share directly with each other.
+
+| Route | Purpose |
+| --- | --- |
+| `POST /announce` | Signed by the member's Ed25519 key: name, optional iRacing ID, listen port, listed or not. The address is the one Cloudflare sees. |
+| `POST /leave` | Signed: stop being found. The iRacing ID stays claimed. |
+| `GET /members` | Members who chose to be listed and are online (last 10 minutes). |
+| `GET /lookup?id=<member id>` / `?iracingId=<n>` | Where one member is now. By member ID for anyone online; by iRacing ID only for listed members. |
+
+One iRacing ID can belong to one member key (first claim wins, the holder can release it). There are no accounts, tokens or quotas beyond a limit on new members per address. Table: `sync_presence` (`src/db/migration_03_sync_presence.sql`). Tests: `npm test` (real routes on a real SQLite database; no network, no deploy). Deploying and applying the migration remotely need the owner's approval.
