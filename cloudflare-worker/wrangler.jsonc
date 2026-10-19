@@ -30,6 +30,10 @@
     }
   ],
 
+  // Connection set-up between Data Sync members (WebSocket hub; stores nothing)
+  "durable_objects": { "bindings": [{ "name": "SYNC_HUB", "class_name": "SyncHub" }] },
+  "migrations": [{ "tag": "v1", "new_sqlite_classes": ["SyncHub"] }],
+
   "vars": {
     "APP_NAME": "Her Motorsport"
   }

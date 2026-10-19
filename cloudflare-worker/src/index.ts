@@ -2,10 +2,12 @@ import { Hono } from 'hono';
 import { cors } from 'hono/cors';
 import { secureHeaders } from 'hono/secure-headers';
 import { registerSyncRoutes } from './sync.ts';
+export { SyncHub } from './hub.ts';
 
 type Bindings = {
   DB: D1Database;
   ASSETS: Fetcher;
+  SYNC_HUB: DurableObjectNamespace;
   APP_NAME?: string;
 };
 

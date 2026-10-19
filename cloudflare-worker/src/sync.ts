@@ -4,7 +4,7 @@ import type { Hono } from 'hono';
 // It stores NO files and no feed content, only who is online, under what name, and where to connect.
 // Every write is signed by the member's own Ed25519 key, so nobody can announce for someone else.
 
-type SyncEnv = { DB: D1Database };
+type SyncEnv = { DB: D1Database; SYNC_HUB: DurableObjectNamespace };
 
 const ALPHABET = 'abcdefghijklmnopqrstuvwxyz234567';
 const CLOCK_SKEW_SECONDS = 300;
@@ -47,7 +47,7 @@ export function decodeMemberKey(id: unknown): Uint8Array | null {
   return out.length === 32 ? Uint8Array.from(out) : null;
 }
 
-function fromBase64(text: string): Uint8Array | null {
+export function fromBase64(text: string): Uint8Array | null {
   try {
     const binary = atob(text);
     return Uint8Array.from(binary, (c) => c.charCodeAt(0));
@@ -56,7 +56,7 @@ function fromBase64(text: string): Uint8Array | null {
   }
 }
 
-async function verifySignature(key: Uint8Array, body: Uint8Array, signature: Uint8Array): Promise<boolean> {
+export async function verifySignature(key: Uint8Array, body: Uint8Array, signature: Uint8Array): Promise<boolean> {
   try {
     const imported = await crypto.subtle.importKey('raw', key, { name: 'Ed25519' }, false, ['verify']);
     return await crypto.subtle.verify({ name: 'Ed25519' }, imported, signature, body);
@@ -172,6 +172,22 @@ export function registerSyncRoutes<E extends { Bindings: SyncEnv }>(app: Hono<E>
     if (signed instanceof Response) return signed;
     await c.env.DB.prepare(`UPDATE sync_presence SET last_seen = 0, listed = 0 WHERE key = ? AND ts < ?`).bind(signed.keyId, signed.body.ts).run();
     return c.json({ ok: true });
+  });
+
+  // The app keeps one WebSocket open to the hub so connection offers and answers are pushed to the member they are for (no polling).
+  // The member proves who they are by signing "hms-socket|<member id>|<unix time>".
+  app.get('/api/sync/v1/socket', async (c) => {
+    if (c.req.header('Upgrade') !== 'websocket') return c.text('Expected a WebSocket', 426);
+    const id = c.req.query('key') ?? '';
+    const ts = Number(c.req.query('ts'));
+    const key = decodeMemberKey(id);
+    const signature = fromBase64(c.req.query('sig') ?? '');
+    if (!key || !signature || signature.length !== 64 || !Number.isInteger(ts)) return c.text('Bad request', 400);
+    if (Math.abs(Date.now() / 1000 - ts) > CLOCK_SKEW_SECONDS) return c.text('Clock is off by more than five minutes', 400);
+    if (!(await verifySignature(key, new TextEncoder().encode(`hms-socket|${id}|${ts}`), signature))) return c.text('Signature does not match the member key', 401);
+    const forwarded = new Request(c.req.raw);
+    forwarded.headers.set('X-Member-Key', id);
+    return c.env.SYNC_HUB.get(c.env.SYNC_HUB.idFromName('hub')).fetch(forwarded);
   });
 
   // Members who chose to be listed and are online now.
