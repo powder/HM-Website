@@ -60,6 +60,7 @@ CREATE TABLE IF NOT EXISTS sync_presence (
     port INTEGER NOT NULL,
     listed INTEGER NOT NULL DEFAULT 0,
     last_seen INTEGER NOT NULL,
+    active_at INTEGER NOT NULL DEFAULT 0,
     ts INTEGER NOT NULL
 );
 

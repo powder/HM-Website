@@ -545,6 +545,16 @@ app.delete('/api/admin/drivers/:id', async (c) => {
   }
 });
 
+// --- Admin: free an iRacing ID claimed by a lost or squatting Data Sync key ---
+app.post('/api/admin/sync/release', async (c) => {
+  if (!(await verifyAdmin(c))) return c.json({ success: false, message: 'Admin access required' }, 403);
+  const body = await c.req.json().catch(() => ({}) as any);
+  const iracingId = Number(body?.iracingId);
+  if (!Number.isInteger(iracingId) || iracingId < 1) return c.json({ success: false, message: 'iracingId is required' }, 400);
+  await c.env.DB.prepare(`UPDATE sync_presence SET iracing_id = NULL WHERE iracing_id = ?`).bind(iracingId).run();
+  return c.json({ success: true, message: `iRacing ID ${iracingId} is free to claim again` });
+});
+
 // --- HMS Data Sync rendezvous (presence only; stores no files) ---
 registerSyncRoutes(app);
 

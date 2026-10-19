@@ -4,10 +4,10 @@ import { readFileSync } from 'node:fs';
 import { DatabaseSync } from 'node:sqlite';
 import { Hono } from 'hono';
 import { registerSyncRoutes } from '../src/sync.ts';
+import adminApp from '../src/index.ts';
 
 // The real routes run against a real SQLite database (D1 is SQLite) through a thin D1-shaped adapter.
-function fakeD1() {
-  const db = new DatabaseSync(':memory:');
+function fakeD1(db: DatabaseSync) {
   db.exec(readFileSync(new URL('../src/db/migration_03_sync_presence.sql', import.meta.url), 'utf8'));
   return {
     prepare(sql: string) {
@@ -68,9 +68,11 @@ function announce(m: Member, extra: object = {}) {
 function setup() {
   const app = new Hono<{ Bindings: { DB: D1Database } }>();
   registerSyncRoutes(app);
-  const env = { DB: fakeD1() };
+  const db = new DatabaseSync(':memory:');
+  const env = { DB: fakeD1(db) };
   const call = (path: string, init?: RequestInit) => app.request(path, init, env);
-  return { call };
+  const admin = (path: string, init?: RequestInit) => adminApp.request(path, init, env as any);
+  return { call, db, admin };
 }
 
 test('a signed announcement is listed and can be looked up', async () => {
@@ -164,4 +166,36 @@ test('lookups reject malformed queries', async () => {
   assert.equal((await call('/api/sync/v1/lookup')).status, 400);
   assert.equal((await call('/api/sync/v1/lookup?id=nope')).status, 400);
   assert.equal((await call('/api/sync/v1/lookup?iracingId=abc')).status, 400);
+});
+
+test('a claim lapses after 90 days of silence so a lost key does not lock an ID forever', async () => {
+  const { call, db } = setup();
+  const lost = await member();
+  const fresh = await member();
+  await call('/api/sync/v1/announce', await signed(lost, announce(lost, { iracingId: 555 })));
+  assert.equal((await call('/api/sync/v1/announce', await signed(fresh, announce(fresh, { iracingId: 555 }), '203.0.113.8'))).status, 409, 'recent holder keeps it');
+  db.prepare('UPDATE sync_presence SET active_at = ?, last_seen = ? WHERE key = ?').run(now() - 91 * 24 * 3600, now() - 91 * 24 * 3600, lost.id);
+  assert.equal((await call('/api/sync/v1/announce', await signed(fresh, announce(fresh, { iracingId: 555, ts: now() + 1 }), '203.0.113.8'))).status, 200, 'lapsed claim can be taken');
+  assert.equal(((await (await call('/api/sync/v1/lookup?iracingId=555')).json()) as any).member.id, fresh.id);
+  assert.equal((db.prepare('SELECT iracing_id FROM sync_presence WHERE key = ?').get(lost.id) as any)?.iracing_id ?? null, null, 'the old holder keeps no claim (its stale row is also cleaned up)');
+});
+
+test('going offline does not start the lapse clock', async () => {
+  const { call, db } = setup();
+  const a = await member();
+  await call('/api/sync/v1/announce', await signed(a, announce(a, { iracingId: 66 })));
+  await call('/api/sync/v1/leave', await signed(a, { v: 1, key: a.id, ts: now() + 2 }));
+  assert.ok((db.prepare('SELECT active_at FROM sync_presence WHERE key = ?').get(a.id) as any).active_at > now() - 60);
+});
+
+test('an administrator can free an iRacing ID', async () => {
+  const { call, admin } = setup();
+  const a = await member();
+  const b = await member();
+  await call('/api/sync/v1/announce', await signed(a, announce(a, { iracingId: 31337 })));
+  const body = JSON.stringify({ iracingId: 31337 });
+  assert.equal((await admin('/api/admin/sync/release', { method: 'POST', body })).status, 403, 'not an admin');
+  const freed = await admin('/api/admin/sync/release', { method: 'POST', body, headers: { 'X-Admin-Id': 'nanenj@gmail.com', 'Content-Type': 'application/json' } });
+  assert.equal(freed.status, 200);
+  assert.equal((await call('/api/sync/v1/announce', await signed(b, announce(b, { iracingId: 31337 }), '203.0.113.9'))).status, 200);
 });

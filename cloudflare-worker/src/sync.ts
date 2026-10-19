@@ -12,6 +12,8 @@ const ONLINE_SECONDS = 600;
 const MAX_LISTED = 200;
 const MAX_KEYS_PER_ADDRESS = 10;
 const STALE_UNCLAIMED_SECONDS = 30 * 24 * 3600;
+/** An iRacing ID claim lapses when its holder has not announced for this long, so a lost key or a new PC does not lock an ID forever. */
+const CLAIM_LAPSE_SECONDS = 90 * 24 * 3600;
 const MAX_BODY_BYTES = 1024;
 
 interface PresenceRow {
@@ -22,6 +24,7 @@ interface PresenceRow {
   port: number;
   listed: number;
   last_seen: number;
+  active_at: number;
   ts: number;
 }
 
@@ -132,6 +135,8 @@ export function registerSyncRoutes<E extends { Bindings: SyncEnv }>(app: Hono<E>
 
     // One iRacing ID, one member key. The first key to claim an ID keeps it until it releases it.
     if (iracingId !== null) {
+      // A claim whose holder has been silent for 90 days has lapsed and can be taken.
+      await c.env.DB.prepare(`UPDATE sync_presence SET iracing_id = NULL WHERE iracing_id = ? AND key <> ? AND active_at < ?`).bind(iracingId, keyId, now - CLAIM_LAPSE_SECONDS).run();
       const other = (await c.env.DB.prepare(`SELECT key FROM sync_presence WHERE iracing_id = ? AND key <> ?`).bind(iracingId, keyId).first()) as { key: string } | null;
       if (other) return c.json({ ok: false, message: `iRacing ID ${iracingId} is already used by another member` }, 409);
     }
@@ -141,17 +146,17 @@ export function registerSyncRoutes<E extends { Bindings: SyncEnv }>(app: Hono<E>
 
     try {
       await c.env.DB.prepare(
-        `INSERT INTO sync_presence (key, iracing_id, name, ip, port, listed, last_seen, ts)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+        `INSERT INTO sync_presence (key, iracing_id, name, ip, port, listed, last_seen, active_at, ts)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
          ON CONFLICT(key) DO UPDATE SET iracing_id = excluded.iracing_id, name = excluded.name, ip = excluded.ip,
-           port = excluded.port, listed = excluded.listed, last_seen = excluded.last_seen, ts = excluded.ts`
-      ).bind(keyId, iracingId, name, ip, port, body.listed ? 1 : 0, now, body.ts).run();
+           port = excluded.port, listed = excluded.listed, last_seen = excluded.last_seen, active_at = excluded.active_at, ts = excluded.ts`
+      ).bind(keyId, iracingId, name, ip, port, body.listed ? 1 : 0, now, now, body.ts).run();
     } catch (err: any) {
       if (String(err?.message ?? err).includes('UNIQUE')) return c.json({ ok: false, message: `iRacing ID ${iracingId} is already used by another member` }, 409);
       throw err;
     }
     // Housekeeping: forget members with no claimed ID who have been gone a month.
-    const cleanup = c.env.DB.prepare(`DELETE FROM sync_presence WHERE iracing_id IS NULL AND last_seen < ?`).bind(now - STALE_UNCLAIMED_SECONDS).run();
+    const cleanup = c.env.DB.prepare(`DELETE FROM sync_presence WHERE iracing_id IS NULL AND active_at < ?`).bind(now - STALE_UNCLAIMED_SECONDS).run();
     try {
       c.executionCtx.waitUntil(cleanup);
     } catch {
