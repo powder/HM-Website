@@ -1299,6 +1299,44 @@ section.alternate-band {
   justify-content: space-between;
   border-top: 1px solid rgba(255, 255, 255, 0.08);
   padding-top: 1rem;
+  gap: 1rem;
+}
+
+.pass-rmqr-wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  align-items: flex-start;
+}
+
+.pass-rmqr-link {
+  display: inline-block;
+  line-height: 0;
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+  border-radius: var(--radius-sm);
+}
+
+.pass-rmqr-link:hover {
+  transform: translateY(-1px);
+}
+
+.pass-rmqr-img {
+  height: 32px;
+  width: auto;
+  max-width: 210px;
+  background: #ffffff;
+  padding: 3px 5px;
+  border-radius: var(--radius-sm);
+  box-shadow: 0 0 14px rgba(173, 124, 243, 0.45);
+  display: block;
+}
+
+.pass-rmqr-label {
+  font-family: var(--font-mono);
+  font-size: 0.58rem;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  color: var(--hm-purple-bright);
 }
 
 .pass-barcode {

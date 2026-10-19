@@ -766,8 +766,11 @@
         </div>
 
         <div class="pass-bottom">
-          <div class="pass-barcode" aria-hidden="true">
-            <span>||| | |||| || ||| |||| | || ||||| ||| |</span>
+          <div class="pass-rmqr-wrap" title="Scan with camera for driver accreditation">
+            <a href="?driver=${encodeURIComponent(String(data.carNumber || '42'))}" class="pass-rmqr-link" target="_blank" rel="noopener">
+              <img src="assets/img/rmqr-sample.svg" alt="rMQR Driver Accreditation Pass" class="pass-rmqr-img" width="180" height="34">
+            </a>
+            <span class="pass-rmqr-label">rMQR PADDOCK SCAN &bull; #HM-${escapeHTML(String(data.carNumber || '42'))}</span>
           </div>
           <span class="pass-expiry">VALID: 2026 CHAMPIONSHIP</span>
         </div>
@@ -802,9 +805,58 @@
 
   // --- Attach Event Listeners ---
 
+  function checkDriverQueryParam() {
+    var params = new URLSearchParams(window.location.search);
+    var driverNum = params.get('driver') || (window.location.hash.startsWith('#driver-') ? window.location.hash.replace('#driver-', '') : null);
+    if (!driverNum) return;
+
+    var paddockSection = document.getElementById('members');
+    if (paddockSection) {
+      setTimeout(function() {
+        paddockSection.scrollIntoView({ behavior: 'smooth' });
+      }, 350);
+    }
+
+    var passCard = document.getElementById('paddock-pass-card');
+    if (passCard) {
+      fetch('/api/roster').then(function(r) { return r.json(); }).then(function(data) {
+        var match = null;
+        if (data && data.success && Array.isArray(data.drivers)) {
+          match = data.drivers.find(function(d) {
+            return String(d.carNumber) === String(driverNum) || (d.alias && d.alias.toLowerCase() === driverNum.toLowerCase());
+          });
+        }
+        if (match) {
+          renderPaddockPass(passCard, match);
+        } else {
+          renderPaddockPass(passCard, {
+            alias: 'ACCREDITED DRIVER #' + driverNum,
+            carNumber: driverNum,
+            sim: 'iRacing',
+            division: 'Spec Racing',
+            pronouns: 'she/her',
+            status: 'Verified Driver',
+            joinedDate: '2026 Season'
+          });
+        }
+      }).catch(function() {
+        renderPaddockPass(passCard, {
+          alias: 'ACCREDITED DRIVER #' + driverNum,
+          carNumber: driverNum,
+          sim: 'iRacing',
+          division: 'Spec Racing',
+          pronouns: 'she/her',
+          status: 'Verified Driver',
+          joinedDate: '2026 Season'
+        });
+      });
+    }
+  }
+
   function initMembers() {
     updateUI();
     fetchRoster();
+    checkDriverQueryParam();
 
     // Live typing on signup inputs -> live updates Paddock Pass
     var inputIds = ['signup-alias', 'signup-number', 'signup-sim', 'signup-division', 'signup-pronouns'];
